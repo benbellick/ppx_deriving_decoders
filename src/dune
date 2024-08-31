@@ -2,5 +2,6 @@
  (name ppx_deriving_decoders)
  (public_name ppx_deriving_decoders)
  (libraries ppxlib)
- (preprocess (pps ppxlib.metaquot))
+ (preprocess
+  (pps ppxlib.metaquot))
  (kind ppx_deriver))
