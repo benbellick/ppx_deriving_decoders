@@ -13,6 +13,7 @@ depends: [
   "ocaml"
   "dune" {>= "3.11"}
   "ppxlib"
+  "decoders"
   "odoc" {with-doc}
 ]
 build: [
