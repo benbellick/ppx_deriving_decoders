@@ -1,4 +1,0 @@
-(executable
- (public_name ppx_deriving_decoders)
- (name main)
- (libraries ppx_deriving_decoders))

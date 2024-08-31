@@ -19,7 +19,7 @@
  (name ppx_deriving_decoders)
  (synopsis "Deriving Decoders using PPX")
  (description "A longer description")
- (depends ocaml dune)
+ (depends ocaml dune ppxlib)
  (tags
   (topics "to describe" your project)))
 

@@ -12,6 +12,7 @@ bug-reports: "https://github.com/benbellick/ppx_deriving_decoders/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.11"}
+  "ppxlib"
   "odoc" {with-doc}
 ]
 build: [

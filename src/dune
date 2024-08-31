@@ -1,0 +1,4 @@
+(executable
+ (public_name ppx_deriving_decoders)
+ (name ppx_deriving_decoders)
+ (libraries ppx_deriving_decoders ppxlib))
