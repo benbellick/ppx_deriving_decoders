@@ -1,2 +1,3 @@
 (test
- (name ppx_deriving_decoders))
+ (name test)
+ (preprocess (pps ppx_deriving_decoders)))

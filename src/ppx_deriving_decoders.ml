@@ -1,4 +1,5 @@
 open Ppxlib
+module D = Decoders_yojson.Safe.Decode
 
 let str_gen ~(loc : location) ~(path : label)
     ((_rec : rec_flag), (t : type_declaration list)) : structure_item list =
@@ -6,31 +7,22 @@ let str_gen ~(loc : location) ~(path : label)
   let _path = path in
   let t = List.hd t in
   match t.ptype_kind with
-  | Ptype_abstract -> []
-  | Ptype_variant _ -> []
+  | Ptype_abstract -> (
+      let _name = t.ptype_name.txt in
+      (* let fn_name = name ^^ "of_yojson" in *)
+      let _cstr = t.ptype_cstrs in
+      let core_type_desc =
+        (* TODO: shouldn't be using this function *)
+        (CCOption.get_exn_or "Error getting ptype_manifest" t.ptype_manifest)
+          .ptyp_desc
+      in
+      match core_type_desc with
+      | Ptyp_constr ({ txt = Lident "int"; loc = _ }, _) ->
+          [%str let name = "blah"]
+      | _ -> [] (* TODO should handle rest *))
+  | Ptype_variant _v -> []
   | Ptype_record _ -> []
   | Ptype_open -> []
-
-(* let str_gen ~loc ~path (_rec, (t : type_declaration)) = *)
-
-(* let sig_gen ~loc ~path:_ (_rec, t) = *)
-(*   let (module Ast) = Ast_builder.make loc in *)
-(*   (\* we are silently dropping mutually recursive definitions to keep things *)
-(*     brief *\) *)
-(*   let t = List.hd t in *)
-(*   let name = module_name_of_type t in *)
-(*   let type_ = *)
-(*     let sig_ = *)
-(*       [%sig: *)
-(*         val path : string *)
-(*         val name : string *)
-(*       ] *)
-(*     in *)
-(*     Ast.pmty_signature sig_ *)
-(*   in *)
-(*   Ast.module_declaration ~name ~type_ *)
-(*   |> Ast.psig_module *)
-(*   |> fun x -> [ x ] *)
 
 let name = "decoders"
 
