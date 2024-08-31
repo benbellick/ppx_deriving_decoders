@@ -1,2 +1,2 @@
 (library
- (name ppx_deriving_decoders))
+ (name lib_ppx_deriving_decoders))

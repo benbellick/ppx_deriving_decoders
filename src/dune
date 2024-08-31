@@ -1,4 +1,6 @@
-(executable
- (public_name ppx_deriving_decoders)
+(library
  (name ppx_deriving_decoders)
- (libraries ppx_deriving_decoders ppxlib))
+ (public_name ppx_deriving_decoders)
+ (libraries ppxlib)
+ (preprocess (pps ppxlib.metaquot))
+ (kind ppx_deriver))
