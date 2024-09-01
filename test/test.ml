@@ -11,7 +11,7 @@ type my_int_list = int list [@@deriving decoders]
 type my_int_array = int array [@@deriving decoders]
 type my_unit = unit [@@deriving decoders]
 type my_opt_bool = bool option [@@deriving decoders]
-(* type my_tuple = int * string * int * bool [@@deriving decoders] *)
+type my_tuple = int * string * int * bool [@@deriving decoders]
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -69,7 +69,7 @@ let%test "bool option" =
   | Ok b -> b = None
   | Error _ -> false
 
-let%test "not a real test" =
-  match D.decode_string Dummy.dec {|[10, "hello", true]|} with
-  | Ok b -> b = (10, "hello", true)
+let%test "tuple" =
+  match D.decode_string my_tuple_decoder {|[10, "hello", 15, true]|} with
+  | Ok b -> b = (10, "hello", 15, true)
   | Error _ -> false

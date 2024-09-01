@@ -37,36 +37,34 @@ let rec expr_of_typ (typ : core_type) : expression =
   | _ -> failwith "Unhandled"
 
 and expr_of_tuple ~loc typs =
+  let argn = Printf.sprintf "arg%d" in
   let typ_exprs = List.map expr_of_typ typs in
-  let base body =
-    [%expr
-      let open D in
-      let ( >>=:: ) fst rest = uncons rest fst in
-      [%e body]]
+  let base =
+    ( (fun body ->
+        [%expr
+          let open D in
+          let ( >>=:: ) fst rest = uncons rest fst in
+          [%e body]]),
+      0 )
   in
-  let expr_builder partial_expr next_expr body =
-    partial_expr [%expr [%e next_expr] >>=:: fun arg1 -> [%e body]]
+  let expr_builder (partial_expr, i) next_expr =
+    let var = argn i in
+    let var_pat = Ast_builder.Default.pvar ~loc var in
+    ( (fun body ->
+        partial_expr [%expr [%e next_expr] >>=:: fun [%p var_pat] -> [%e body]]),
+      i + 1 )
   in
-  let complete_partial_expr = List.fold_left expr_builder base typ_exprs in
-  complete_partial_expr [%expr succeed (arg1, arg1)]
-
-(* and expr_of_tuple ~loc = function *)
-(*   | [] -> failwith "Cannot have an empty tuple" *)
-(*   | typ :: typs -> *)
-(*       let base = expr_of_typ typ in *)
-(*       let uncons = Ast_builder.Default.evar ~loc "D.uncons" in *)
-(*       let pipe = Ast_builder.Default.evar ~loc "(|>)" in *)
-(*       (\* TODO this location cannot be correct *\) *)
-(*       let ( |> ) v f = *)
-(*         (\* TODO this location cannot be correct *\) *)
-(*         Ast_builder.Default.eapply ~loc pipe [ v; f ] *)
-(*       in *)
-(*       let folder tuple_dec ty : expression = *)
-(*         let ty_dec = expr_of_typ ty in *)
-(*         let uncons_f = Ast_builder.Default.eapply ~loc uncons [ tuple_dec ] in *)
-(*         ty_dec |> uncons_f *)
-(*       in *)
-(*       List.fold_left folder base typs *)
+  let complete_partial_expr, var_count =
+    List.fold_left expr_builder base typ_exprs
+  in
+  let var_names = CCList.init var_count argn in
+  let var_tuple =
+    let expr_list =
+      List.map (fun s -> [%expr [%e Ast_builder.Default.evar ~loc s]]) var_names
+    in
+    Ast_builder.Default.pexp_tuple ~loc expr_list
+  in
+  complete_partial_expr [%expr succeed [%e var_tuple]]
 
 let str_gen ~(loc : location) ~(path : label)
     ((_rec : rec_flag), (type_decl : type_declaration list)) :
