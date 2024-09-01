@@ -37,9 +37,20 @@ let rec expr_of_typ (typ : core_type) : expression =
   | _ -> failwith "Unhandled"
 
 and expr_of_tuple ~loc typs =
+  (* To help understand what this function is doing, imagine we had
+     a type [type t = int * string * bool]. Then this will render the decoder:
+     let t_decoder : t D.decoder =
+     let open D in
+     let ( >>=:: ) fst rest = uncons rest fst in
+     int >>=:: fun arg1 ->
+     string >>=:: fun arg2 ->
+     bool >>=:: fun arg3 -> succeed (arg1, arg2, arg3)
+  *)
   let argn = Printf.sprintf "arg%d" in
-  let typ_exprs = List.map expr_of_typ typs in
+  let typ_decoder_exprs = List.map expr_of_typ typs in
   let base =
+    (* Consists of the initial setup partial function def, which is the inport and local definition,
+       as well as a running count of how many arguments there are *)
     ( (fun body ->
         [%expr
           let open D in
@@ -47,15 +58,16 @@ and expr_of_tuple ~loc typs =
           [%e body]]),
       0 )
   in
-  let expr_builder (partial_expr, i) next_expr =
+  let fn_builder (partial_expr, i) next_decoder =
     let var = argn i in
     let var_pat = Ast_builder.Default.pvar ~loc var in
     ( (fun body ->
-        partial_expr [%expr [%e next_expr] >>=:: fun [%p var_pat] -> [%e body]]),
+        partial_expr
+          [%expr [%e next_decoder] >>=:: fun [%p var_pat] -> [%e body]]),
       i + 1 )
   in
   let complete_partial_expr, var_count =
-    List.fold_left expr_builder base typ_exprs
+    List.fold_left fn_builder base typ_decoder_exprs
   in
   let var_names = CCList.init var_count argn in
   let var_tuple =
