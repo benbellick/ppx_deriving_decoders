@@ -4,7 +4,9 @@ open Ppxlib
 (* open Asttypes *)
 module D = Decoders_yojson.Safe.Decode
 
-let expr_of_typ ~loc (typ : core_type) : expression =
+let my_func x y = x + y
+
+let rec expr_of_typ ~loc (typ : core_type) : expression =
   match typ with
   (* | [%type: unit] | [%type: unit] -> *)
   (* [%expr fun () -> Ppx_deriving_runtime.Format.pp_print_string fmt "()"] *)
@@ -17,22 +19,17 @@ let expr_of_typ ~loc (typ : core_type) : expression =
   | [%type: Nativeint.t] ->
       Ast_builder.Default.evar ~loc "D.int"
   | [%type: float] -> Ast_builder.Default.evar ~loc "D.float"
+  | [%type: bool] -> Ast_builder.Default.evar ~loc "D.bool"
+  | [%type: char] | [%type: string] | [%type: String.t] ->
+      Ast_builder.Default.evar ~loc "D.char"
+  | [%type: bytes] | [%type: Bytes.t] ->
+      failwith "Cannot handle Bytes" (* TODO: figure out strategy *)
+  | [%type: [%t? inner_typ] list] | [%type: [%t? inner_typ] array] ->
+      let list_decoder = Ast_builder.Default.evar ~loc "D.list" in
+      let sub_expr = expr_of_typ ~loc inner_typ in
+      Ast_helper.Exp.apply ~loc list_decoder [ (Nolabel, sub_expr) ]
+  (* | [%type: [%t? typ] option] -> _ *)
   | _ -> failwith "Unhandled"
-(* | [%type: bool] -> format "%B" *)
-(* | [%type: char] -> format "%C" *)
-(* | [%type: string] | [%type: String.t] -> format "%S" *)
-(* | { ptyp_desc = Ptyp_any; _ } *)
-(* | { ptyp_desc = Ptyp_var _; _ } *)
-(* | { ptyp_desc = Ptyp_arrow (_, _, _); _ } *)
-(* | { ptyp_desc = Ptyp_tuple _; _ } *)
-(* | { ptyp_desc = Ptyp_constr (_, _); _ } *)
-(* | { ptyp_desc = Ptyp_object (_, _); _ } *)
-(* | { ptyp_desc = Ptyp_class (_, _); _ } *)
-(* | { ptyp_desc = Ptyp_alias (_, _); _ } *)
-(* | { ptyp_desc = Ptyp_variant (_, _, _); _ } *)
-(* | { ptyp_desc = Ptyp_poly (_, _); _ } *)
-(* | { ptyp_desc = Ptyp_package _; _ } *)
-(* | { ptyp_desc = Ptyp_extension _; _ } -> *)
 
 let str_gen ~(loc : location) ~(path : label)
     ((_rec : rec_flag), (type_decl : type_declaration list)) :
