@@ -1,0 +1,4 @@
+(executable
+ (name pp)
+ (modules pp)
+ (libraries ppx_deriving_decoders ppxlib))

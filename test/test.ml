@@ -1,16 +1,59 @@
 module D = Decoders_yojson.Safe.Decode
 
-type t = int [@@deriving decoders]
-type t1 = int [@@deriving_inline decoders]
+type my_int = int [@@deriving decoders]
 
-[@@@deriving.end]
+(* type my_int32 = int32 [@@deriving decoders] *)
+(* type my_int64 = int64 [@@deriving decoders] *)
+type my_float = float [@@deriving decoders]
+type my_string = string [@@deriving decoders]
+type my_bool = bool [@@deriving decoders]
+type my_int_list = int list [@@deriving decoders]
+type my_int_array = int array [@@deriving decoders]
+type my_unit = unit [@@deriving decoders]
 
-type t2 = int32 [@@deriving_inline decoders]
+let%test "int" =
+  match D.decode_string my_int_decoder "1234" with
+  | Ok i -> i = 1234
+  | Error _ -> false
 
-[@@@deriving.end]
-(* let r = D.decode_string t1_decoder "1" *)
+(* let%test "int32" = *)
+(*   match D.decode_string my_int32_decoder "4321" with *)
+(*   | Ok i -> i = 4321 *)
+(*   | Error _ -> false *)
 
-(* let () = *)
-(* match r with *)
-(* | Ok s -> Format.printf "%i" s *)
-(* | Error _ -> Format.printf "Parse Error" *)
+(* let%test "int64" = *)
+(*   match D.decode_string my_int64_decoder "1239001" with *)
+(*   | Ok i -> i = 1239001 *)
+(*   | Error _ -> false *)
+
+let%test "float" =
+  match D.decode_string my_float_decoder "1239001.1230" with
+  | Ok f -> f = 1239001.1230
+  | Error _ -> false
+
+let%test "string" =
+  match
+    D.decode_string my_string_decoder {|"this is a very special string"|}
+  with
+  | Ok s -> s = "this is a very special string"
+  | Error _ -> false
+
+let%test "bool" =
+  match D.decode_string my_bool_decoder "true" with
+  | Ok s -> s
+  | Error _ -> false
+
+let%test "int list" =
+  match D.decode_string my_int_list_decoder "[1, 2, 3, 4, 5]" with
+  | Ok f -> f = [ 1; 2; 3; 4; 5 ]
+  | Error _ -> false
+
+let%test "int list" =
+  match D.decode_string my_int_array_decoder "[1, 2, 3, 4, 5]" with
+  | Ok f -> f = [| 1; 2; 3; 4; 5 |]
+  | Error _ -> false
+
+let%test "unit" =
+  match D.decode_string my_unit_decoder "null" with
+  | Ok f -> f = ()
+  | Error _ -> false
