@@ -8,7 +8,7 @@ let str_gen ~(loc : location) ~(path : label)
   let t = List.hd t in
   match t.ptype_kind with
   | Ptype_abstract -> (
-      let _name = t.ptype_name.txt in
+      let name = t.ptype_name.txt in
       (* let fn_name = name ^^ "of_yojson" in *)
       let _cstr = t.ptype_cstrs in
       let core_type_desc =
@@ -17,14 +17,19 @@ let str_gen ~(loc : location) ~(path : label)
           .ptyp_desc
       in
       match core_type_desc with
-      | Ptyp_constr ({ txt = Lident "int"; loc = _ }, _) ->
-          [%str let name = "blah"]
+      | Ptyp_constr ({ txt = Lident "int"; loc }, _) ->
+          [%str
+            let [%p Ast_builder.Default.pvar ~loc (name ^ "_decoder")] = D.int]
       | _ -> [] (* TODO should handle rest *))
   | Ptype_variant _v -> []
   | Ptype_record _ -> []
   | Ptype_open -> []
 
 let name = "decoders"
+
+let with_suffix_expr ~loc s =
+  let dynamic_node = Ast_builder.Default.estring ~loc s in
+  [%expr [%e dynamic_node] ^ "some_fixed_suffix"]
 
 let () =
   let str_type_decl = Deriving.Generator.make_noarg str_gen in

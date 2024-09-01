@@ -1,3 +1,4 @@
 (test
  (name test)
- (preprocess (pps ppx_deriving_decoders)))
+ (libraries decoders decoders-yojson)
+ (preprocess (pps ppx_deriving_decoders )))
