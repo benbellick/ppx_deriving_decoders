@@ -10,6 +10,7 @@ type my_bool = bool [@@deriving decoders]
 type my_int_list = int list [@@deriving decoders]
 type my_int_array = int array [@@deriving decoders]
 type my_unit = unit [@@deriving decoders]
+type my_opt_bool = bool option [@@deriving decoders]
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -56,4 +57,13 @@ let%test "int list" =
 let%test "unit" =
   match D.decode_string my_unit_decoder "null" with
   | Ok f -> f = ()
+  | Error _ -> false
+
+let%test "bool option" =
+  (match D.decode_string my_opt_bool_decoder "true" with
+  | Ok b -> b = Some true
+  | Error _ -> false)
+  &&
+  match D.decode_string my_opt_bool_decoder "null" with
+  | Ok b -> b = None
   | Error _ -> false

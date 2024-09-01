@@ -33,7 +33,11 @@ let rec expr_of_typ ~loc (typ : core_type) : expression =
       let array_decoder = Ast_builder.Default.evar ~loc "D.array" in
       let sub_expr = expr_of_typ ~loc inner_typ in
       Ast_helper.Exp.apply ~loc array_decoder [ (Nolabel, sub_expr) ]
-  (* | [%type: [%t? typ] option] -> _ *)
+  | [%type: [%t? inner_typ] option] ->
+      let opt_decoder = Ast_builder.Default.evar ~loc "D.nullable" in
+      let sub_expr = expr_of_typ ~loc inner_typ in
+      Ast_helper.Exp.apply ~loc opt_decoder [ (Nolabel, sub_expr) ]
+  (* | { ptyp_desc = Ptyp_tuple typs; _ } -> _ *)
   | _ -> failwith "Unhandled"
 
 let str_gen ~(loc : location) ~(path : label)
