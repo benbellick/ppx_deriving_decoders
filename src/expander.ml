@@ -36,23 +36,37 @@ let rec expr_of_typ (typ : core_type) : expression =
   | { ptyp_desc = Ptyp_tuple typs; _ } -> expr_of_tuple ~loc typs
   | _ -> failwith "Unhandled"
 
-and expr_of_tuple ~loc = function
-  | [] -> failwith "Cannot have an empty tuple"
-  | typ :: typs ->
-      let base = expr_of_typ typ in
-      let uncons = Ast_builder.Default.evar ~loc "D.uncons" in
-      let pipe = Ast_builder.Default.evar ~loc "(|>)" in
-      (* TODO this location cannot be correct *)
-      let ( |> ) v f =
-        (* TODO this location cannot be correct *)
-        Ast_builder.Default.eapply ~loc pipe [ v; f ]
-      in
-      let folder tuple_dec ty : expression =
-        let ty_dec = expr_of_typ ty in
-        let uncons_f = Ast_builder.Default.eapply ~loc uncons [ tuple_dec ] in
-        ty_dec |> uncons_f
-      in
-      List.fold_left folder base typs
+and expr_of_tuple ~loc typs =
+  let typ_exprs = List.map expr_of_typ typs in
+  let base body =
+    [%expr
+      let open D in
+      let ( >>=:: ) fst rest = uncons rest fst in
+      [%e body]]
+  in
+  let expr_builder partial_expr next_expr body =
+    partial_expr [%expr [%e next_expr] >>=:: fun arg1 -> [%e body]]
+  in
+  let complete_partial_expr = List.fold_left expr_builder base typ_exprs in
+  complete_partial_expr [%expr succeed (arg1, arg1)]
+
+(* and expr_of_tuple ~loc = function *)
+(*   | [] -> failwith "Cannot have an empty tuple" *)
+(*   | typ :: typs -> *)
+(*       let base = expr_of_typ typ in *)
+(*       let uncons = Ast_builder.Default.evar ~loc "D.uncons" in *)
+(*       let pipe = Ast_builder.Default.evar ~loc "(|>)" in *)
+(*       (\* TODO this location cannot be correct *\) *)
+(*       let ( |> ) v f = *)
+(*         (\* TODO this location cannot be correct *\) *)
+(*         Ast_builder.Default.eapply ~loc pipe [ v; f ] *)
+(*       in *)
+(*       let folder tuple_dec ty : expression = *)
+(*         let ty_dec = expr_of_typ ty in *)
+(*         let uncons_f = Ast_builder.Default.eapply ~loc uncons [ tuple_dec ] in *)
+(*         ty_dec |> uncons_f *)
+(*       in *)
+(*       List.fold_left folder base typs *)
 
 let str_gen ~(loc : location) ~(path : label)
     ((_rec : rec_flag), (type_decl : type_declaration list)) :
