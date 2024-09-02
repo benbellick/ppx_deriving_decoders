@@ -12,6 +12,11 @@ type my_int_array = int array [@@deriving decoders]
 type my_unit = unit [@@deriving decoders]
 type my_opt_bool = bool option [@@deriving decoders]
 type my_tuple = int * string * int * bool [@@deriving decoders]
+type 'a const = 'a
+
+(* type my_int_const = int const [@@deriving decoders] *)
+type my_nested_bool = my_bool [@@deriving decoders]
+type my_nested_int = my_int [@@deriving decoders]
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -72,4 +77,14 @@ let%test "bool option" =
 let%test "tuple" =
   match D.decode_string my_tuple_decoder {|[10, "hello", 15, true]|} with
   | Ok b -> b = (10, "hello", 15, true)
+  | Error _ -> false
+
+let%test "nested bool" =
+  match D.decode_string my_nested_bool_decoder "true" with
+  | Ok b -> b = true
+  | Error _ -> false
+
+let%test "nested int" =
+  match D.decode_string my_nested_int_decoder "10" with
+  | Ok b -> b = 10
   | Error _ -> false

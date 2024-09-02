@@ -1,6 +1,8 @@
 open Ppxlib
 module D = Decoders_yojson.Safe.Decode
 
+let to_decoder_name i = i ^ "_decoder"
+
 let rec expr_of_typ (typ : core_type) : expression =
   let loc = { typ.ptyp_loc with loc_ghost = true } in
   match typ with
@@ -34,7 +36,24 @@ let rec expr_of_typ (typ : core_type) : expression =
       let sub_expr = expr_of_typ inner_typ in
       Ast_helper.Exp.apply ~loc opt_decoder [ (Nolabel, sub_expr) ]
   | { ptyp_desc = Ptyp_tuple typs; _ } -> expr_of_tuple ~loc typs
-  | _ -> failwith "Unhandled"
+  (* | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc; _ } -> _ *)
+  | { ptyp_desc = Ptyp_alias _; _ } ->
+      failwith
+        (Format.sprintf "This alias was a failure...: %s\n"
+           (string_of_core_type typ))
+  | {
+   ptyp_desc =
+     Ptyp_constr
+       ({ txt = Lident lid (* TODO Do we need to cover other cases? *); _ }, []);
+   _;
+  } ->
+      (* This is the special case of e.g. type t = int, i.e. a trivial type construction *)
+      (* the trick here will be the use the manifest to recursive call into this function again *)
+      (* Format.sprintf "This was a failure...: %s\n" (string_of_core_type typ) *)
+      Ast_builder.Default.evar ~loc (to_decoder_name lid)
+  | _ ->
+      failwith
+        (Format.sprintf "This was a failure...: %s\n" (string_of_core_type typ))
 
 and expr_of_tuple ~loc typs =
   (* To help understand what this function is doing, imagine we had
@@ -78,18 +97,26 @@ and expr_of_tuple ~loc typs =
   in
   complete_partial_expr [%expr succeed [%e var_tuple]]
 
+and _expr_of_constr lid typs =
+  let typ_strs = CCList.map string_of_core_type typs in
+  match lid with
+  | Lident txt ->
+      let typf = CCFormat.(string) in
+      let typ_listf = CCFormat.(list typf) in
+      failwith @@ CCFormat.sprintf "%s = [@[<hov>%a@]]@." txt typ_listf typ_strs
+  | _ -> failwith (Format.sprintf "Failed to decode constr")
+
 let str_gen ~(loc : location) ~(path : label)
     ((_rec : rec_flag), (type_decl : type_declaration list)) :
     structure_item list =
   let _path = path in
   let _loc = loc in
   let type_decl = List.hd type_decl in
-  let name = type_decl.ptype_name.txt in
+  let name = to_decoder_name type_decl.ptype_name.txt in
   match (type_decl.ptype_kind, type_decl.ptype_manifest) with
   | Ptype_abstract, Some manifest ->
       [%str
-        let [%p Ast_builder.Default.pvar ~loc (name ^ "_decoder")] =
-          [%e expr_of_typ manifest]]
+        let [%p Ast_builder.Default.pvar ~loc name] = [%e expr_of_typ manifest]]
   | Ptype_variant _v, _ -> []
   | Ptype_record _, _ -> []
   | Ptype_open, _ -> []
