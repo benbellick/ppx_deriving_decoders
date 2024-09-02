@@ -15,8 +15,11 @@ type my_tuple = int * string * int * bool [@@deriving decoders]
 type 'a const = 'a
 
 (* type my_int_const = int const [@@deriving decoders] *)
+(* TODO: the above could become quite complex in general  *)
 type my_nested_bool = my_bool [@@deriving decoders]
 type my_nested_int = my_int [@@deriving decoders]
+type my_deep_tuple = my_tuple * my_bool [@@deriving decoders]
+type my_basic_cstr = Int of int [@@deriving decoders]
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -87,4 +90,16 @@ let%test "nested bool" =
 let%test "nested int" =
   match D.decode_string my_nested_int_decoder "10" with
   | Ok b -> b = 10
+  | Error _ -> false
+
+let%test "deep tuple" =
+  match
+    D.decode_string my_deep_tuple_decoder {|[[10, "hello", 15, true], true]|}
+  with
+  | Ok b -> b = ((10, "hello", 15, true), true)
+  | Error _ -> false
+
+let%test "basic constructor" =
+  match D.decode_string my_basic_cstr_decoder {|{"Int": 10}|} with
+  | Ok b -> b = Int 10
   | Error _ -> false

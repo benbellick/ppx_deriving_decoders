@@ -47,9 +47,6 @@ let rec expr_of_typ (typ : core_type) : expression =
        ({ txt = Lident lid (* TODO Do we need to cover other cases? *); _ }, []);
    _;
   } ->
-      (* This is the special case of e.g. type t = int, i.e. a trivial type construction *)
-      (* the trick here will be the use the manifest to recursive call into this function again *)
-      (* Format.sprintf "This was a failure...: %s\n" (string_of_core_type typ) *)
       Ast_builder.Default.evar ~loc (to_decoder_name lid)
   | _ ->
       failwith
@@ -117,7 +114,7 @@ let str_gen ~(loc : location) ~(path : label)
   | Ptype_abstract, Some manifest ->
       [%str
         let [%p Ast_builder.Default.pvar ~loc name] = [%e expr_of_typ manifest]]
-  | Ptype_variant _v, _ -> []
-  | Ptype_record _, _ -> []
-  | Ptype_open, _ -> []
-  | _ -> [] (* TODO handle other cases *)
+  | Ptype_variant _v, _ -> Location.raise_errorf ~loc "Unhandled variant"
+  | Ptype_record _, _ -> Location.raise_errorf ~loc "Unhandled record"
+  | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
+  | _ -> Location.raise_errorf ~loc "Unhandled mystery"
