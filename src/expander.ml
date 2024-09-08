@@ -3,6 +3,11 @@ module D = Decoders_yojson.Safe.Decode
 
 let to_decoder_name i = i ^ "_decoder"
 
+let lident_of_constructor_decl (cd : constructor_declaration) =
+  let loc = cd.pcd_name.loc in
+  let name = cd.pcd_name.txt in
+  Ast_builder.Default.Located.lident ~loc name (* Convert to lident *)
+
 let rec expr_of_typ (typ : core_type) : expression =
   let loc = { typ.ptyp_loc with loc_ghost = true } in
   match typ with
@@ -52,7 +57,7 @@ let rec expr_of_typ (typ : core_type) : expression =
       failwith
         (Format.sprintf "This was a failure...: %s\n" (string_of_core_type typ))
 
-and expr_of_tuple ~loc typs =
+and expr_of_tuple ~loc ?lift typs =
   (* To help understand what this function is doing, imagine we had
      a type [type t = int * string * bool]. Then this will render the decoder:
      let t_decoder : t D.decoder =
@@ -61,6 +66,14 @@ and expr_of_tuple ~loc typs =
      int >>=:: fun arg1 ->
      string >>=:: fun arg2 ->
      bool >>=:: fun arg3 -> succeed (arg1, arg2, arg3)
+
+     Though if lift is present (lift is a type constructor), we will instead get:
+     let t_decoder : t D.decoder =
+     let open D in
+     let ( >>=:: ) fst rest = uncons rest fst in
+     int >>=:: fun arg1 ->
+     string >>=:: fun arg2 ->
+     bool >>=:: fun arg3 -> succeed (lift (arg1, arg2, arg3))
   *)
   let argn = Printf.sprintf "arg%d" in
   let typ_decoder_exprs = List.map expr_of_typ typs in
@@ -92,7 +105,14 @@ and expr_of_tuple ~loc typs =
     in
     Ast_builder.Default.pexp_tuple ~loc expr_list
   in
-  complete_partial_expr [%expr succeed [%e var_tuple]]
+  match lift with
+  | Some lift ->
+      let var_tuple_lift =
+        Ast_builder.Default.pexp_construct ~loc lift
+          (Some [%expr [%e var_tuple]])
+      in
+      complete_partial_expr [%expr succeed [%e var_tuple_lift]]
+  | None -> complete_partial_expr [%expr succeed [%e var_tuple]]
 
 and _expr_of_constr lid typs =
   let typ_strs = CCList.map string_of_core_type typs in
@@ -100,8 +120,25 @@ and _expr_of_constr lid typs =
   | Lident txt ->
       let typf = CCFormat.(string) in
       let typ_listf = CCFormat.(list typf) in
-      failwith @@ CCFormat.sprintf "%s = [@[<hov>%a@]]@." txt typ_listf typ_strs
+      failwith @@ CCFormat.sprintf "%s = [@[<HOV>%a@]]@." txt typ_listf typ_strs
   | _ -> failwith (Format.sprintf "Failed to decode constr")
+
+and expr_of_constr_decl
+    (* ({ pcd_name; pcd_vars; pcd_args; pcd_res; pcd_loc = loc; pcd_attributes } :    *)
+      ({ pcd_name; pcd_args; pcd_loc = loc; _ } as cstr_decl :
+        constructor_declaration) =
+  let field_decoder = Ast_builder.Default.evar ~loc "D.field" in
+  let field = Ast_builder.Default.estring ~loc pcd_name.txt in
+  let cstr = lident_of_constructor_decl cstr_decl in
+  let sub_expr = expr_of_constr_arg ~loc ~cstr pcd_args in
+  Ast_helper.Exp.apply ~loc field_decoder
+    [ (Nolabel, field); (Nolabel, sub_expr) ]
+
+and expr_of_constr_arg ~loc ~cstr (arg : constructor_arguments) =
+  match arg with
+  | Pcstr_tuple tups -> expr_of_tuple ~lift:cstr ~loc tups
+  | Pcstr_record _ ->
+      Location.raise_errorf ~loc "Unhandled record in constr decl arg"
 
 let str_gen ~(loc : location) ~(path : label)
     ((_rec : rec_flag), (type_decl : type_declaration list)) :
@@ -114,7 +151,21 @@ let str_gen ~(loc : location) ~(path : label)
   | Ptype_abstract, Some manifest ->
       [%str
         let [%p Ast_builder.Default.pvar ~loc name] = [%e expr_of_typ manifest]]
-  | Ptype_variant _v, _ -> Location.raise_errorf ~loc "Unhandled variant"
+  | Ptype_variant cstrs, None ->
+      let constr_decs =
+        Ast_builder.Default.(
+          elist ~loc
+            (List.map
+               (fun cstr ->
+                 pexp_tuple ~loc
+                   [ estring ~loc cstr.pcd_name.txt; expr_of_constr_decl cstr ])
+               cstrs))
+      in
+      let one_of_decoder = Ast_builder.Default.evar ~loc "D.one_of" in
+      let app =
+        Ast_helper.Exp.apply ~loc one_of_decoder [ (Nolabel, constr_decs) ]
+      in
+      [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e app]]
   | Ptype_record _, _ -> Location.raise_errorf ~loc "Unhandled record"
   | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
   | _ -> Location.raise_errorf ~loc "Unhandled mystery"

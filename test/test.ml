@@ -100,6 +100,6 @@ let%test "deep tuple" =
   | Error _ -> false
 
 let%test "basic constructor" =
-  match D.decode_string my_basic_cstr_decoder {|{"Int": 10}|} with
+  match D.decode_string my_basic_cstr_decoder {|{"Int": [10]}|} with
   | Ok b -> b = Int 10
   | Error _ -> false
