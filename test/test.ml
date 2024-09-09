@@ -21,6 +21,9 @@ type my_nested_int = my_int [@@deriving decoders]
 type my_deep_tuple = my_tuple * my_bool [@@deriving decoders]
 type my_basic_cstr = Int of int [@@deriving decoders]
 
+type my_basic_cstr2 = Ints of int * int | Strs of string * string
+[@@deriving decoders]
+
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
   | Ok i -> i = 1234
@@ -102,4 +105,15 @@ let%test "deep tuple" =
 let%test "basic constructor" =
   match D.decode_string my_basic_cstr_decoder {|{"Int": [10]}|} with
   | Ok b -> b = Int 10
+  | Error _ -> false
+
+let%test "basic constructor 2" =
+  (match D.decode_string my_basic_cstr2_decoder {|{"Ints": [10, 11]}|} with
+  | Ok b -> b = Ints (10, 11)
+  | Error _ -> false)
+  &&
+  match
+    D.decode_string my_basic_cstr2_decoder {|{"Strs": ["first", "second"]}|}
+  with
+  | Ok b -> b = Strs ("first", "second")
   | Error _ -> false
