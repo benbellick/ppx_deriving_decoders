@@ -124,9 +124,8 @@ and _expr_of_constr lid typs =
   | _ -> failwith (Format.sprintf "Failed to decode constr")
 
 and expr_of_constr_decl
-    (* ({ pcd_name; pcd_vars; pcd_args; pcd_res; pcd_loc = loc; pcd_attributes } :    *)
-      ({ pcd_name; pcd_args; pcd_loc = loc; _ } as cstr_decl :
-        constructor_declaration) =
+    ({ pcd_name; pcd_args; pcd_loc = loc; _ } as cstr_decl :
+      constructor_declaration) =
   let field_decoder = Ast_builder.Default.evar ~loc "D.field" in
   let field = Ast_builder.Default.estring ~loc pcd_name.txt in
   let cstr = lident_of_constructor_decl cstr_decl in
@@ -140,7 +139,16 @@ and expr_of_constr_arg ~loc ~cstr (arg : constructor_arguments) =
   | Pcstr_record _ ->
       Location.raise_errorf ~loc "Unhandled record in constr decl arg"
 
-and expr_of_rec ~loc label_decls =
+and expr_of_record ~loc label_decls =
+  (* To help understand what this function is doing, imagine we had
+     a type [type t = {i : int; s : string}]. Then this will render the decoder:
+     let t_decoder : t D.decoder =
+     let open D in
+     let open D.Infix in
+     let* i = field "i" int in
+     let* s = field "s" string in
+     succeed {i; s}
+  *)
   let base
       (* Consists of the initial setup partial function def, which is the inport and local definition,
          as well as a running count of how many arguments there are *)
@@ -203,6 +211,6 @@ let str_gen ~(loc : location) ~(path : label)
   | Ptype_record label_decs, _ ->
       [%str
         let [%p Ast_builder.Default.pvar ~loc name] =
-          [%e expr_of_rec ~loc label_decs]]
+          [%e expr_of_record ~loc label_decs]]
   | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
   | _ -> Location.raise_errorf ~loc "Unhandled mystery"
