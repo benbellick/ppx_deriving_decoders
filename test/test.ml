@@ -22,6 +22,9 @@ type my_deep_tuple = my_tuple * my_bool [@@deriving decoders]
 type my_basic_cstr = Int of int [@@deriving decoders]
 type my_basic_record = { i : int } [@@deriving decoders]
 
+type my_complex_record = { basic : my_basic_record; cstr : my_basic_cstr }
+[@@deriving decoders]
+
 type my_basic_cstr2 = Ints of int * int | Strs of string * string
 [@@deriving decoders]
 
@@ -29,16 +32,6 @@ let%test "int" =
   match D.decode_string my_int_decoder "1234" with
   | Ok i -> i = 1234
   | Error _ -> false
-
-(* let%test "int32" = *)
-(*   match D.decode_string my_int32_decoder "4321" with *)
-(*   | Ok i -> i = 4321 *)
-(*   | Error _ -> false *)
-
-(* let%test "int64" = *)
-(*   match D.decode_string my_int64_decoder "1239001" with *)
-(*   | Ok i -> i = 1239001 *)
-(*   | Error _ -> false *)
 
 let%test "float" =
   match D.decode_string my_float_decoder "1239001.1230" with
@@ -122,4 +115,12 @@ let%test "basic constructor 2" =
 let%test "basic record" =
   match D.decode_string my_basic_record_decoder {|{"i": 10}|} with
   | Ok b -> b = { i = 10 }
+  | Error _ -> false
+
+let%test "complex record" =
+  match
+    D.decode_string my_complex_record_decoder
+      {|{"basic" : {"i": 10}, "cstr": {"Int": [10]}}|}
+  with
+  | Ok b -> b = { basic = { i = 10 }; cstr = Int 10 }
   | Error _ -> false
