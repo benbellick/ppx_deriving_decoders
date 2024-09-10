@@ -186,11 +186,17 @@ and expr_of_record ~loc label_decls =
   let record = Ast_builder.Default.pexp_record ~loc var_names None in
   complete_partial_expr [%expr succeed [%e record]]
 
-let str_gen ~(loc : location) ~(path : label)
-    ((_rec_flag : rec_flag), type_decls) : structure_item list =
+let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls)
+    : structure_item list =
+  let rec_flag = really_recursive rec_flag type_decls in
   let _path = path in
   let type_decl = List.hd type_decls in
   let name = to_decoder_name type_decl.ptype_name.txt in
+  print_string "\n\n Some INFO: \n";
+  print_string "really recursive? ";
+  print_string (match rec_flag with Recursive -> "Yes" | Nonrecursive -> "No");
+  print_string "\n type: ";
+  print_string type_decl.ptype_name.txt;
   match (type_decl.ptype_kind, type_decl.ptype_manifest) with
   | Ptype_abstract, Some manifest ->
       [%str
