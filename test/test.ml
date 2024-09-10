@@ -118,3 +118,8 @@ let%test "basic constructor 2" =
   with
   | Ok b -> b = Strs ("first", "second")
   | Error _ -> false
+
+let%test "basic record" =
+  match D.decode_string my_basic_record_decoder {|{"i": 10}|} with
+  | Ok b -> b = { i = 10 }
+  | Error _ -> false
