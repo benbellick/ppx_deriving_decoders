@@ -20,6 +20,7 @@ type my_nested_bool = my_bool [@@deriving decoders]
 type my_nested_int = my_int [@@deriving decoders]
 type my_deep_tuple = my_tuple * my_bool [@@deriving decoders]
 type my_basic_cstr = Int of int [@@deriving decoders]
+type my_basic_record = { i : int } [@@deriving decoders]
 
 type my_basic_cstr2 = Ints of int * int | Strs of string * string
 [@@deriving decoders]

@@ -140,11 +140,45 @@ and expr_of_constr_arg ~loc ~cstr (arg : constructor_arguments) =
   | Pcstr_record _ ->
       Location.raise_errorf ~loc "Unhandled record in constr decl arg"
 
+and expr_of_rec ~loc label_decls =
+  let base
+      (* Consists of the initial setup partial function def, which is the inport and local definition,
+         as well as a running count of how many arguments there are *)
+        body =
+    [%expr
+      let open D in
+      let open D.Infix in
+      [%e body]]
+  in
+
+  let fn_builder partial_expr ({ pld_name; pld_type; _ } : label_declaration) =
+    let subexpr = expr_of_typ pld_type in
+    let var_pat = Ast_builder.Default.pvar ~loc:pld_name.loc pld_name.txt in
+    (* TODO correct loc?  *)
+    let str = Ast_builder.Default.estring ~loc:pld_name.loc pld_name.txt in
+    fun body ->
+      partial_expr
+        [%expr
+          let* [%p var_pat] = field [%e str] [%e subexpr] in
+          [%e body]]
+  in
+
+  let complete_partial_expr = List.fold_left fn_builder base label_decls in
+  let var_names =
+    CCList.map
+      (fun (label_decl : label_declaration) ->
+        Ast_builder.Default.
+          ( { txt = Longident.Lident label_decl.pld_name.txt; loc },
+            evar ~loc label_decl.pld_name.txt ))
+      label_decls
+  in
+  let record = Ast_builder.Default.pexp_record ~loc var_names None in
+  complete_partial_expr [%expr succeed [%e record]]
+
 let str_gen ~(loc : location) ~(path : label)
     ((_rec : rec_flag), (type_decl : type_declaration list)) :
     structure_item list =
   let _path = path in
-  let _loc = loc in
   let type_decl = List.hd type_decl in
   let name = to_decoder_name type_decl.ptype_name.txt in
   match (type_decl.ptype_kind, type_decl.ptype_manifest) with
@@ -166,6 +200,9 @@ let str_gen ~(loc : location) ~(path : label)
         Ast_helper.Exp.apply ~loc one_of_decoder [ (Nolabel, constr_decs) ]
       in
       [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e app]]
-  | Ptype_record _, _ -> Location.raise_errorf ~loc "Unhandled record"
+  | Ptype_record label_decs, _ ->
+      [%str
+        let [%p Ast_builder.Default.pvar ~loc name] =
+          [%e expr_of_rec ~loc label_decs]]
   | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
   | _ -> Location.raise_errorf ~loc "Unhandled mystery"
