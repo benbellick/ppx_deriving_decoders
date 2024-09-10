@@ -54,8 +54,8 @@ let rec expr_of_typ (typ : core_type) : expression =
   } ->
       Ast_builder.Default.evar ~loc (to_decoder_name lid)
   | _ ->
-      failwith
-        (Format.sprintf "This was a failure...: %s\n" (string_of_core_type typ))
+      Location.raise_errorf ~loc "Cannot construct decoder for %s"
+        (string_of_core_type typ)
 
 and expr_of_tuple ~loc ?lift typs =
   (* To help understand what this function is doing, imagine we had
@@ -114,24 +114,27 @@ and expr_of_tuple ~loc ?lift typs =
       complete_partial_expr [%expr succeed [%e var_tuple_lift]]
   | None -> complete_partial_expr [%expr succeed [%e var_tuple]]
 
-and _expr_of_constr lid typs =
-  let typ_strs = CCList.map string_of_core_type typs in
-  match lid with
-  | Lident txt ->
-      let typf = CCFormat.(string) in
-      let typ_listf = CCFormat.(list typf) in
-      failwith @@ CCFormat.sprintf "%s = [@[<HOV>%a@]]@." txt typ_listf typ_strs
-  | _ -> failwith (Format.sprintf "Failed to decode constr")
-
 and expr_of_constr_decl
     ({ pcd_name; pcd_args; pcd_loc = loc; _ } as cstr_decl :
       constructor_declaration) =
-  let field_decoder = Ast_builder.Default.evar ~loc "D.field" in
-  let field = Ast_builder.Default.estring ~loc pcd_name.txt in
-  let cstr = lident_of_constructor_decl cstr_decl in
-  let sub_expr = expr_of_constr_arg ~loc ~cstr pcd_args in
-  Ast_helper.Exp.apply ~loc field_decoder
-    [ (Nolabel, field); (Nolabel, sub_expr) ]
+  if pcd_args = Pcstr_tuple [] then
+    let s_exp = Ast_builder.Default.estring ~loc pcd_name.txt in
+    let s_pat = Ast_builder.Default.pstring ~loc pcd_name.txt in
+    let cstr = lident_of_constructor_decl cstr_decl in
+    let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
+    [%expr
+      let open D in
+      let open D.Infix in
+      D.string >>= function
+      | [%p s_pat] -> succeed [%e cstr]
+      | e -> fail ("Could not decode " ^ e ^ " into " ^ [%e s_exp])]
+  else
+    let field_decoder = Ast_builder.Default.evar ~loc "D.field" in
+    let field = Ast_builder.Default.estring ~loc pcd_name.txt in
+    let cstr = lident_of_constructor_decl cstr_decl in
+    let sub_expr = expr_of_constr_arg ~loc ~cstr pcd_args in
+    Ast_helper.Exp.apply ~loc field_decoder
+      [ (Nolabel, field); (Nolabel, sub_expr) ]
 
 and expr_of_constr_arg ~loc ~cstr (arg : constructor_arguments) =
   match arg with
@@ -184,10 +187,9 @@ and expr_of_record ~loc label_decls =
   complete_partial_expr [%expr succeed [%e record]]
 
 let str_gen ~(loc : location) ~(path : label)
-    ((_rec : rec_flag), (type_decl : type_declaration list)) :
-    structure_item list =
+    ((_rec_flag : rec_flag), type_decls) : structure_item list =
   let _path = path in
-  let type_decl = List.hd type_decl in
+  let type_decl = List.hd type_decls in
   let name = to_decoder_name type_decl.ptype_name.txt in
   match (type_decl.ptype_kind, type_decl.ptype_manifest) with
   | Ptype_abstract, Some manifest ->

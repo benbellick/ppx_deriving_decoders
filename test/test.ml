@@ -13,8 +13,8 @@ type my_unit = unit [@@deriving decoders]
 type my_opt_bool = bool option [@@deriving decoders]
 type my_tuple = int * string * int * bool [@@deriving decoders]
 type 'a const = 'a
-
 (* type my_int_const = int const [@@deriving decoders] *)
+
 (* TODO: the above could become quite complex in general  *)
 type my_nested_bool = my_bool [@@deriving decoders]
 type my_nested_int = my_int [@@deriving decoders]
@@ -27,6 +27,9 @@ type my_complex_record = { basic : my_basic_record; cstr : my_basic_cstr }
 
 type my_basic_cstr2 = Ints of int * int | Strs of string * string
 [@@deriving decoders]
+
+type colors = Red | Blue | Green [@@deriving decoders]
+type status = Online of int | Offline [@@deriving decoders]
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -124,3 +127,17 @@ let%test "complex record" =
   with
   | Ok b -> b = { basic = { i = 10 }; cstr = Int 10 }
   | Error _ -> false
+
+let%test "simple constructor-less variant" =
+  match D.decode_string colors_decoder {|"Red"|} with
+  | Ok Red -> true
+  | _ -> false
+
+let%test "mixed constructor/less variant" =
+  (match D.decode_string status_decoder {|{"Online": [10]}|} with
+  | Ok (Online 10) -> true
+  | _ -> false)
+  &&
+  match D.decode_string status_decoder {|"Offline"|} with
+  | Ok Offline -> true
+  | _ -> false
