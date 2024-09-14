@@ -197,6 +197,7 @@ let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls
   print_string (match rec_flag with Recursive -> "Yes" | Nonrecursive -> "No");
   print_string "\n type: ";
   print_string type_decl.ptype_name.txt;
+  (* TODO: To fix the issue with recursive types, pass in the rec_flag and use that to build an aux function which then becomes a subfunction to build the parent function.  *)
   match (type_decl.ptype_kind, type_decl.ptype_manifest) with
   | Ptype_abstract, Some manifest ->
       [%str
