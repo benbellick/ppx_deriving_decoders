@@ -4,7 +4,7 @@ module D = Decoders_yojson.Safe.Decode
 let to_decoder_name i = i ^ "_decoder"
 
 (** We take an expr implementation with name NAME and turn it into:
-    let rec NAME_AUX () = expr in NAME_AUX ().
+    let rec NAME_AUX = fun () -> expr in NAME_AUX ().
 
     This is so that we can later do:
 
@@ -15,14 +15,13 @@ let to_decoder_name i = i ^ "_decoder"
     Thus fixing the recursive type issue. 
  *)
 let wrap_as_aux ~loc ~name ~expr =
-  let aux_name_str = Ast_builder.Default.estring ~loc (name ^ "_aux") in
-  let aux_app =
-    Ast_builder.Default.p ~loc aux_name_str
-      [ (Nolabel, Ast_builder.Default.eunit ~loc) ]
-  in
+  let open Ast_builder.Default in
+  let aux_fn_p = pvar ~loc (name ^ "_aux") in
+  let aux_fn_e = evar ~loc (name ^ "_aux") in
+  let aux_app = eapply ~loc aux_fn_e [ eunit ~loc ] in
   [%expr
-    let rec [%p aux_app] = [%e expr] in
-    [%expr aux_app]]
+    let rec [%p aux_fn_p] = fun () -> [%e expr] in
+    [%e aux_app]]
 
 let lident_of_constructor_decl (cd : constructor_declaration) =
   let loc = cd.pcd_name.loc in
