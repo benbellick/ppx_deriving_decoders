@@ -3,6 +3,27 @@ module D = Decoders_yojson.Safe.Decode
 
 let to_decoder_name i = i ^ "_decoder"
 
+(** We take an expr implementation with name NAME and turn it into:
+    let rec NAME_AUX () = expr in NAME_AUX ().
+
+    This is so that we can later do:
+
+
+    let NAME =
+      let rec NAME_AUX () = expr in NAME_AUX ()
+
+    Thus fixing the recursive type issue. 
+ *)
+let wrap_as_aux ~loc ~name ~expr =
+  let aux_name_str = Ast_builder.Default.estring ~loc (name ^ "_aux") in
+  let aux_app =
+    Ast_builder.Default.p ~loc aux_name_str
+      [ (Nolabel, Ast_builder.Default.eunit ~loc) ]
+  in
+  [%expr
+    let rec [%p aux_app] = [%e expr] in
+    [%expr aux_app]]
+
 let lident_of_constructor_decl (cd : constructor_declaration) =
   let loc = cd.pcd_name.loc in
   let name = cd.pcd_name.txt in
