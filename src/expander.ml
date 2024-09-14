@@ -62,10 +62,10 @@ let rec expr_of_typ (typ : core_type) : expression =
       Ast_helper.Exp.apply ~loc opt_decoder [ (Nolabel, sub_expr) ]
   | { ptyp_desc = Ptyp_tuple typs; _ } -> expr_of_tuple ~loc typs
   (* | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc; _ } -> _ *)
-  | { ptyp_desc = Ptyp_alias _; _ } ->
-      failwith
-        (Format.sprintf "This alias was a failure...: %s\n"
-           (string_of_core_type typ))
+  (* | { ptyp_desc = Ptyp_alias _; _ } -> *)
+  (*     failwith *)
+  (*       (Format.sprintf "This alias was a failure...: %s\n" *)
+  (*          (string_of_core_type typ)) *)
   | {
    ptyp_desc =
      Ptyp_constr
@@ -160,6 +160,7 @@ and expr_of_constr_arg ~loc ~cstr (arg : constructor_arguments) =
   match arg with
   | Pcstr_tuple tups -> expr_of_tuple ~lift:cstr ~loc tups
   | Pcstr_record _ ->
+      (* TODO: This is an easy fix *)
       Location.raise_errorf ~loc "Unhandled record in constr decl arg"
 
 and expr_of_record ~loc label_decls =
@@ -217,7 +218,9 @@ let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls
   print_string (match rec_flag with Recursive -> "Yes" | Nonrecursive -> "No");
   print_string "\n type: ";
   print_string type_decl.ptype_name.txt;
-  (* TODO: To fix the issue with recursive types, pass in the rec_flag and use that to build an aux function which then becomes a subfunction to build the parent function.  *)
+  (* TODO: To fix the issue with recursive types, pass in the rec_flag and use that to build an aux function which then becomes a subfunction to build the parent function.
+     I think the right approach after that is to pass down a list from the top level which tracks the types which are "true recursive" (and can expand as the functions nest deeper). That way we can actually know to call `dec_aux ()` in place of `dec` when we find the decoder for typ dec.
+  *)
   match (type_decl.ptype_kind, type_decl.ptype_manifest) with
   | Ptype_abstract, Some manifest ->
       [%str

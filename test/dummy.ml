@@ -20,7 +20,9 @@ module D = Decoders_yojson.Safe.Decode
 
 (* let _ = my_list_decoder *)
 
-type my_list = Null | L of my_list
+type my_list = Null | L of my_list [@@deriving_inline decoders]
+
+[@@@deriving.end]
 
 open D
 
@@ -49,7 +51,9 @@ let my_list_decoder : my_list D.decoder =
 type int
 
 type a = { b : b option }
-and b = { a : a option }
+and b = { a : a option } [@@deriving decoders]
+
+type c = { i : int; c : c option }
 
 (* Decoder for type 'a' *)
 
