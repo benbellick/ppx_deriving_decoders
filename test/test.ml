@@ -30,7 +30,7 @@ type my_basic_cstr2 = Ints of int * int | Strs of string * string
 
 type colors = Red | Blue | Green [@@deriving decoders]
 type status = Online of int | Offline [@@deriving decoders]
-(* type my_list = Null | L of my_list [@@deriving decoders] *)
+type my_list = Null | L of my_list [@@deriving decoders]
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -130,8 +130,12 @@ let%test "complex record" =
   | Error _ -> false
 
 let%test "simple constructor-less variant" =
-  match D.decode_string colors_decoder {|"Red"|} with
+  (match D.decode_string colors_decoder {|"Red"|} with
   | Ok Red -> true
+  | _ -> false)
+  &&
+  match D.decode_string colors_decoder {|"Blue"|} with
+  | Ok Blue -> true
   | _ -> false
 
 let%test "mixed constructor/less variant" =
@@ -141,4 +145,13 @@ let%test "mixed constructor/less variant" =
   &&
   match D.decode_string status_decoder {|"Offline"|} with
   | Ok Offline -> true
+  | _ -> false
+
+let%test "my list" =
+  (match D.decode_string my_list_decoder {|"Null"|} with
+  | Ok Null -> true
+  | _ -> false)
+  &&
+  match D.decode_string my_list_decoder {|{"L": "Null"}|} with
+  | Ok (L Null) -> true
   | _ -> false

@@ -151,26 +151,16 @@ and expr_of_tuple ~loc ~true_recurse ?lift typs =
   | None -> complete_partial_expr [%expr succeed [%e var_tuple]]
 
 and expr_of_constr_decl ~true_recurse
-    ({ pcd_name; pcd_args; pcd_loc = loc; _ } as cstr_decl :
-      constructor_declaration) =
+    ({ pcd_args; pcd_loc = loc; _ } as cstr_decl : constructor_declaration) =
+  (* We assume at this point that the decomposition into indiviaul fields is handled by caller *)
   if pcd_args = Pcstr_tuple [] then
-    let s_exp = Ast_builder.Default.estring ~loc pcd_name.txt in
-    let s_pat = Ast_builder.Default.pstring ~loc pcd_name.txt in
     let cstr = lident_of_constructor_decl cstr_decl in
     let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
-    [%expr
-      let open D in
-      let open D.Infix in
-      D.string >>= function
-      | [%p s_pat] -> succeed [%e cstr]
-      | e -> fail ("Could not decode " ^ e ^ " into " ^ [%e s_exp])]
+    [%expr succeed [%e cstr]]
   else
-    let field_decoder = Ast_builder.Default.evar ~loc "D.field" in
-    let field = Ast_builder.Default.estring ~loc pcd_name.txt in
     let cstr = lident_of_constructor_decl cstr_decl in
     let sub_expr = expr_of_constr_arg ~true_recurse ~loc ~cstr pcd_args in
-    Ast_helper.Exp.apply ~loc field_decoder
-      [ (Nolabel, field); (Nolabel, sub_expr) ]
+    sub_expr
 
 and expr_of_constr_arg ~loc ~cstr ~true_recurse (arg : constructor_arguments) =
   match arg with
@@ -246,20 +236,26 @@ let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ ~true_recurse manifest
     | Ptype_variant cstrs, None ->
-        let constr_decs =
-          Ast_builder.Default.(
-            elist ~loc
-              (List.map
-                 (fun cstr ->
-                   pexp_tuple ~loc
-                     [
-                       estring ~loc cstr.pcd_name.txt;
-                       expr_of_constr_decl ~true_recurse cstr;
-                     ])
-                 cstrs))
+        let to_case cstr =
+          let name = Ast_builder.Default.pstring ~loc cstr.pcd_name.txt in
+          let dec_expr = expr_of_constr_decl ~true_recurse cstr in
+          Ast_builder.Default.case ~lhs:name ~guard:None ~rhs:dec_expr
         in
-        let one_of_decoder = Ast_builder.Default.evar ~loc "D.one_of" in
-        Ast_helper.Exp.apply ~loc one_of_decoder [ (Nolabel, constr_decs) ]
+
+        let cases = List.map to_case cstrs in
+        let fail_case =
+          let var_p = Ast_builder.Default.pvar ~loc "s" in
+          let var_e = Ast_builder.Default.evar ~loc "s" in
+          Ast_builder.Default.case ~lhs:var_p ~guard:None
+            ~rhs:[%expr fail ("Could not decode " ^ [%e var_e])]
+        in
+        let cases = cases @ [ fail_case ] in
+        let f = Ast_builder.Default.pexp_function ~loc cases in
+        let string_decoder = Ast_builder.Default.evar ~loc "D.string" in
+        [%expr
+          let open D in
+          let open D.Infix in
+          [%e string_decoder] >>= [%e f]]
     | Ptype_record label_decs, _ -> expr_of_record ~true_recurse ~loc label_decs
     | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
     | _ -> Location.raise_errorf ~loc "Unhandled mystery"
