@@ -30,7 +30,7 @@ type my_basic_cstr2 = Ints of int * int | Strs of string * string
 
 type colors = Red | Blue | Green [@@deriving decoders]
 type status = Online of int | Offline [@@deriving decoders]
-type my_list = Null | L of my_list [@@deriving decoders]
+(* type my_list = Null | L of my_list [@@deriving decoders] *)
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with

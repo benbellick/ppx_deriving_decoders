@@ -20,48 +20,80 @@ module D = Decoders_yojson.Safe.Decode
 
 (* let _ = my_list_decoder *)
 
-type my_list = Null | L of my_list [@@deriving_inline decoders]
+type my_list = Null | L of my_list
 
-[@@@deriving.end]
+let _ = fun (_ : my_list) -> ()
 
-open D
-
-let rec my_list_decoder : my_list D.decoder =
-  fix @@ fun my_list_decoder ->
-  string >>= function
-  | "Null" -> succeed Null
-  | "L" ->
-      (* We expect the nested my_list for the L constructor *)
-      field "next" my_list_decoder >>= fun nested_list ->
-      succeed (L nested_list)
-  | _ -> fail "Expected 'Null' or 'L'"
-
-let my_list_decoder : my_list D.decoder =
-  let rec my_list_decoder_aux () : my_list D.decoder =
-    string >>= function
-    | "Null" -> succeed Null
-    | "L" ->
-        (* We expect the nested my_list for the L constructor *)
-        field "next" (my_list_decoder_aux ()) >>= fun nested_list ->
-        succeed (L nested_list)
-    | _ -> fail "Expected 'Null' or 'L'"
+let my_list_decoder =
+  let open D in
+  let open D.Infix in
+  let rec my_list_decoder_aux () =
+    one_of
+      [
+        ( "Null",
+          string >>= function
+          | "Null" -> succeed Null
+          | e -> fail ("Could not decode " ^ e ^ " into " ^ "Null") );
+        ( "L",
+          field "L"
+            (* (let ( >>=:: ) fst rest = uncons rest fst in *)
+            ( my_list_decoder_aux () >>= fun arg0 -> succeed (L arg0) ) );
+      ]
   in
   my_list_decoder_aux ()
 
-type int
+let my_list_decoder =
+  let open D in
+  let open D.Infix in
+  let rec my_list_decoder_aux () =
+    string >>= function
+    | "Null" -> succeed Null
+    | "L" -> my_list_decoder_aux () >>= fun arg0 -> succeed (L arg0)
+    | _ -> fail "Failed"
+  in
 
-type a = { b : b option }
-and b = { a : a option } [@@deriving decoders]
+  my_list_decoder_aux ()
 
-type c = { i : int; c : c option }
+(* let _ = my_list_decoder *)
+(* open D *)
 
-(* Decoder for type 'a' *)
+(* let rec my_list_decoder : my_list D.decoder = *)
+(*   fix @@ fun my_list_decoder -> *)
+(*   string >>= function *)
+(*   | "Null" -> succeed Null *)
+(*   | "L" -> *)
+(*       (\* We expect the nested my_list for the L constructor *\) *)
+(*       field "next" my_list_decoder >>= fun nested_list -> *)
+(*       succeed (L nested_list) *)
+(*   | _ -> fail "Expected 'Null' or 'L'" *)
 
-let rec decode_a_aux () : a D.decoder =
-  field "b" (maybe (decode_b_aux ())) |> map (fun b -> { b })
+(* let my_list_decoder : my_list D.decoder = *)
+(*   let open D in *)
+(*   let open D.Infix in *)
+(*   let rec my_list_decoder_aux () : my_list D.decoder = *)
+(*     string >>= function *)
+(*     | "Null" -> succeed Null *)
+(*     | "L" -> *)
+(*         (\* We expect the nested my_list for the L constructor *\) *)
+(*         my_list_decoder_aux () >>= fun nested_list -> succeed (L nested_list) *)
+(*     | _ -> fail "Expected 'Null' or 'L'" *)
+(*   in *)
+(*   my_list_decoder_aux () *)
 
-and decode_b_aux () : b D.decoder =
-  field "a" (maybe (decode_a_aux ())) |> map (fun a -> { a })
+(* type int *)
 
-let decode_a : a D.decoder = decode_a_aux ()
-let decode_b : b D.decoder = decode_b_aux ()
+(* type a = { b : b option } *)
+(* and b = { a : a option } [@@deriving decoders] *)
+
+(* type c = { i : int; c : c option } *)
+
+(* (\* Decoder for type 'a' *\) *)
+
+(* let rec decode_a_aux () : a D.decoder = *)
+(*   field "b" (maybe (decode_b_aux ())) |> map (fun b -> { b }) *)
+
+(* and decode_b_aux () : b D.decoder = *)
+(*   field "a" (maybe (decode_a_aux ())) |> map (fun a -> { a }) *)
+
+(* let decode_a : a D.decoder = decode_a_aux () *)
+(* let decode_b : b D.decoder = decode_b_aux () *)
