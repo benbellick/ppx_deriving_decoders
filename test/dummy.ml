@@ -20,7 +20,9 @@ module D = Decoders_yojson.Safe.Decode
 
 (* let _ = my_list_decoder *)
 
-type my_list = Null | L of my_list
+(* type my_list = Null | L of my_list [@@deriving_inline decoders] *)
+
+(* [@@@deriving.end] *)
 (* type col = Blue | Red [@@deriving_inline decoders] *)
 
 (* [@@@deriving.end] *)
@@ -45,24 +47,24 @@ type my_list = Null | L of my_list
 (*   my_list_decoder_aux () *)
 
 (* NOTE: Unfortunately, the BELOW is the correct implementation, rather than the above, which is the current implemtnation *)
-let my_list_decoder =
-  let open D in
-  let open D.Infix in
-  fix (fun my_list_decoder_aux ->
-      one_of
-        [
-          ( "Null",
-            string >>= function
-            | "Null" -> succeed Null
-            | e -> fail ("Could not decode " ^ e ^ " into " ^ "Null") );
-          ( "L",
-            field "L"
-              (* (let ( >>=:: ) fst rest = uncons rest fst in *)
-              ( my_list_decoder_aux >>= fun arg0 -> succeed (L arg0) ) );
-        ])
+(* let my_list_decoder = *)
+(*   let open D in *)
+(*   let open D.Infix in *)
+(*   fix (fun my_list_decoder_aux -> *)
+(*       one_of *)
+(*         [ *)
+(*           ( "Null", *)
+(*             string >>= function *)
+(*             | "Null" -> succeed Null *)
+(*             | e -> fail ("Could not decode " ^ e ^ " into " ^ "Null") ); *)
+(*           ( "L", *)
+(*             field "L" *)
+(*               (\* (let ( >>=:: ) fst rest = uncons rest fst in *\) *)
+(*               ( my_list_decoder_aux >>= fun arg0 -> succeed (L arg0) ) ); *)
+(*         ]) *)
 
 (* let _ = *)
-(*   match D.decode_string my_list_decoder "Null" with *)
+(*   match D.decode_string my_list_decoder {|{"L": "Null"}|} with *)
 (*   | Ok Null -> print_string "Found Null" *)
 (*   | Ok (L Null) -> print_string "L Null" *)
 (*   | Ok _ -> print_string "Went well" *)
@@ -139,3 +141,47 @@ let my_list_decoder =
 (*   | s -> fail ("Could not decode" ^ s) *)
 
 (* let _ = my_basic_cstr_decoder *)
+(* type my_basic_cstr = Int of int [@@deriving_inline decoders] *)
+
+(* [@@@deriving.end] *)
+
+(* let my_basic_cstr_decoder = *)
+(*   let open D in *)
+(*   let open D.Infix in *)
+(*   one_of *)
+(*     [ *)
+(*       ( "Int", *)
+(*         D.field "Int" *)
+(*           (let ( >>=:: ) fst rest = uncons rest fst in *)
+(*            D.int >>=:: fun arg0 -> succeed (Int arg0)) ); *)
+(*     ] *)
+
+(* let _ = my_basic_cstr_decoder *)
+(* (\* let _ = *\) *)
+(* (\*   match D.decode_string my_basic_cstr_decoder {|{"Int": [10]}|} with *\) *)
+(* (\*   | Ok (Int 10) -> print_string "We did it!" *\) *)
+(* (\*   | Ok _ -> print_string "Weird" *\) *)
+(* (\*   | Error e -> print_string (D.string_of_error e) *\) *)
+type colors = Red | Blue | Green
+
+(* THIS is what should be coming out... So that we can handle some cases where we aren't just a constructor *)
+let colors_decoder =
+  let open D in
+  one_of
+    [
+      ( "Red",
+        string >>= function "Red" -> succeed Red | _ -> fail "Expected 'Red'" );
+      ( "Blue",
+        string >>= function
+        | "Blue" -> succeed Blue
+        | _ -> fail "Expected 'Blue'" );
+      ( "Green",
+        string >>= function
+        | "Green" -> succeed Green
+        | _ -> fail "Expected 'Green'" );
+    ]
+
+let () =
+  match D.decode_string colors_decoder {|"Blue"|} with
+  | Ok Blue -> print_string "We did it"
+  | _ -> print_string "We did not :( "

@@ -17,11 +17,7 @@ let to_decoder_name i = i ^ "_decoder"
 let wrap_as_aux ~loc ~name ~expr =
   let open Ast_builder.Default in
   let aux_fn_p = pvar ~loc (name ^ "_aux") in
-  let aux_fn_e = evar ~loc (name ^ "_aux") in
-  let aux_app = eapply ~loc aux_fn_e [ eunit ~loc ] in
-  [%expr
-    let rec [%p aux_fn_p] = fun () -> [%e expr] in
-    [%e aux_app]]
+  [%expr D.fix (fun [%p aux_fn_p] -> [%e expr])]
 
 let lident_of_constructor_decl (cd : constructor_declaration) =
   let loc = cd.pcd_name.loc in
@@ -84,8 +80,7 @@ let rec expr_of_typ (typ : core_type) ~(true_recurse : core_type list) :
         let _ = print_string ("\nit was a mem! : " ^ s) in
         let open Ast_builder.Default in
         let aux_fn_e = evar ~loc (lid ^ "_decoder_aux") in
-        let aux_app = eapply ~loc aux_fn_e [ eunit ~loc ] in
-        [%expr [%e aux_app]]
+        [%expr [%e aux_fn_e]]
       else
         let _ = print_string ("\nit was not a mem :( " ^ s) in
         Ast_builder.Default.evar ~loc (to_decoder_name lid)
@@ -236,26 +231,55 @@ let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ ~true_recurse manifest
     | Ptype_variant cstrs, None ->
-        let to_case cstr =
-          let name = Ast_builder.Default.pstring ~loc cstr.pcd_name.txt in
-          let dec_expr = expr_of_constr_decl ~true_recurse cstr in
-          Ast_builder.Default.case ~lhs:name ~guard:None ~rhs:dec_expr
+        let constr_decs =
+          Ast_builder.Default.(
+            elist ~loc
+              (List.map
+                 (fun cstr ->
+                   let s = estring ~loc cstr.pcd_name.txt in
+                   if cstr.pcd_args = Pcstr_tuple [] then
+                     let lid = lident_of_constructor_decl cstr in
+                     let cstr =
+                       Ast_builder.Default.pexp_construct ~loc lid None
+                     in
+                     [%expr D.string [%e s] >>= succeed [%e cstr]]
+                   else
+                     pexp_tuple ~loc
+                       [
+                         s;
+                         [%expr
+                           D.field [%e s]
+                             [%e expr_of_constr_decl ~true_recurse cstr]];
+                       ])
+                 cstrs))
         in
-
-        let cases = List.map to_case cstrs in
-        let fail_case =
-          let var_p = Ast_builder.Default.pvar ~loc "s" in
-          let var_e = Ast_builder.Default.evar ~loc "s" in
-          Ast_builder.Default.case ~lhs:var_p ~guard:None
-            ~rhs:[%expr fail ("Could not decode " ^ [%e var_e])]
+        let one_of_decoder = Ast_builder.Default.evar ~loc "one_of" in
+        let full_dec =
+          Ast_helper.Exp.apply ~loc one_of_decoder [ (Nolabel, constr_decs) ]
         in
-        let cases = cases @ [ fail_case ] in
-        let f = Ast_builder.Default.pexp_function ~loc cases in
-        let string_decoder = Ast_builder.Default.evar ~loc "D.string" in
         [%expr
           let open D in
-          let open D.Infix in
-          [%e string_decoder] >>= [%e f]]
+          [%e full_dec]]
+        (* in *)
+        (* let to_case cstr = *)
+        (*   let name = Ast_builder.Default.pstring ~loc cstr.pcd_name.txt in *)
+        (*   let dec_expr = expr_of_constr_decl ~true_recurse cstr in *)
+        (*   Ast_builder.Default.case ~lhs:name ~guard:None ~rhs:dec_expr *)
+        (* in *)
+        (* let cases = List.map to_case cstrs in *)
+        (* let fail_case = *)
+        (*   let var_p = Ast_builder.Default.pvar ~loc "s" in *)
+        (*   let var_e = Ast_builder.Default.evar ~loc "s" in *)
+        (*   Ast_builder.Default.case ~lhs:var_p ~guard:None *)
+        (*     ~rhs:[%expr fail ("Could not decode " ^ [%e var_e])] *)
+        (* in *)
+        (* let cases = cases @ [ fail_case ] in *)
+        (* let f = Ast_builder.Default.pexp_function ~loc cases in *)
+        (* let string_decoder = Ast_builder.Default.evar ~loc "D.string" in *)
+        (* [%expr *)
+        (*   let open D in *)
+        (*   let open D.Infix in *)
+        (*   [%e string_decoder] >>= [%e f]] *)
     | Ptype_record label_decs, _ -> expr_of_record ~true_recurse ~loc label_decs
     | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
     | _ -> Location.raise_errorf ~loc "Unhandled mystery"
