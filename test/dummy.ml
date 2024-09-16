@@ -20,9 +20,41 @@ module D = Decoders_yojson.Safe.Decode
 
 (* let _ = my_list_decoder *)
 
-(* type my_list = Null | L of my_list [@@deriving_inline decoders] *)
+type my_list = Null | L of my_list (* [@@deriving_inline decoders] *)
 
 (* [@@@deriving.end] *)
+
+let my_list_decoder =
+  D.fix (fun my_list_decoder_aux ->
+      let open D in
+      one_of
+        [
+          ( "Null",
+            D.string >>= function "Null" -> succeed Null | _ -> fail "Failure"
+          );
+          ( "L",
+            D.field "L"
+              (let open D in
+               let ( >>=:: ) fst rest = uncons rest fst in
+               my_list_decoder_aux >>=:: fun arg0 -> succeed (L arg0)) );
+        ])
+
+let _ =
+  match D.decode_string my_list_decoder {|{"L": ["Null"]}|} with
+  | Ok Null ->
+      print_string "We got Null\n";
+      true
+  | Ok (L Null) ->
+      print_string "We got L Null...\n";
+      true
+  | Ok _ ->
+      print_string "We got something else...\n";
+      true
+  | Error e ->
+      print_string "\n\n\n\n";
+      print_string (D.string_of_error e);
+      false
+
 (* type col = Blue | Red [@@deriving_inline decoders] *)
 
 (* [@@@deriving.end] *)
@@ -162,26 +194,28 @@ module D = Decoders_yojson.Safe.Decode
 (* (\*   | Ok (Int 10) -> print_string "We did it!" *\) *)
 (* (\*   | Ok _ -> print_string "Weird" *\) *)
 (* (\*   | Error e -> print_string (D.string_of_error e) *\) *)
-type colors = Red | Blue | Green
+(* type colors = Red | Blue | Green [@@deriving_inline decoders] *)
 
-(* THIS is what should be coming out... So that we can handle some cases where we aren't just a constructor *)
-let colors_decoder =
-  let open D in
-  one_of
-    [
-      ( "Red",
-        string >>= function "Red" -> succeed Red | _ -> fail "Expected 'Red'" );
-      ( "Blue",
-        string >>= function
-        | "Blue" -> succeed Blue
-        | _ -> fail "Expected 'Blue'" );
-      ( "Green",
-        string >>= function
-        | "Green" -> succeed Green
-        | _ -> fail "Expected 'Green'" );
-    ]
+(* [@@@deriving.end] *)
 
-let () =
-  match D.decode_string colors_decoder {|"Blue"|} with
-  | Ok Blue -> print_string "We did it"
-  | _ -> print_string "We did not :( "
+(* (\* THIS is what should be coming out... So that we can handle some cases where we aren't just a constructor *\) *)
+(* let colors_decoder = *)
+(*   let open D in *)
+(*   one_of *)
+(*     [ *)
+(*       ( "Red", *)
+(*         string >>= function "Red" -> succeed Red | _ -> fail "Expected 'Red'" ); *)
+(*       ( "Blue", *)
+(*         string >>= function *)
+(*         | "Blue" -> succeed Blue *)
+(*         | _ -> fail "Expected 'Blue'" ); *)
+(*       ( "Green", *)
+(*         string >>= function *)
+(*         | "Green" -> succeed Green *)
+(*         | _ -> fail "Expected 'Green'" ); *)
+(*     ] *)
+
+(* let () = *)
+(*   match D.decode_string colors_decoder {|"Blue"|} with *)
+(*   | Ok Blue -> print_string "We did it" *)
+(*   | _ -> print_string "We did not :( " *)

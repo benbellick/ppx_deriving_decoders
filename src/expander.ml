@@ -66,24 +66,15 @@ let rec expr_of_typ (typ : core_type) ~(true_recurse : core_type list) :
   | { ptyp_desc = Ptyp_constr ({ txt = Lident lid; _ }, []); _ } as other_type
     ->
       (* In the case where our type is truly recursive, we need to instead do `type_aux ()` *)
-      let s = string_of_core_type other_type in
-      print_string "\n Checking out the true_recurses...: \n";
-      let _ =
-        List.map CCFun.(print_string % string_of_core_type) true_recurse
-      in
-      print_string "\n Done \n";
       let eq (ct1 : core_type) (ct2 : core_type) =
         (* TODO: This is a terrible way to compare the types... *)
         string_of_core_type ct1 = string_of_core_type ct2
       in
       if CCList.mem ~eq other_type true_recurse then
-        let _ = print_string ("\nit was a mem! : " ^ s) in
         let open Ast_builder.Default in
         let aux_fn_e = evar ~loc (lid ^ "_decoder_aux") in
         [%expr [%e aux_fn_e]]
-      else
-        let _ = print_string ("\nit was not a mem :( " ^ s) in
-        Ast_builder.Default.evar ~loc (to_decoder_name lid)
+      else Ast_builder.Default.evar ~loc (to_decoder_name lid)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)
@@ -219,14 +210,6 @@ let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls
     | Nonrecursive -> []
     | Recursive -> [ core_type_of_type_declaration type_decl ]
   in
-  print_string "\n\n Some INFO: \n";
-  print_string "really recursive? ";
-  print_string (match rec_flag with Recursive -> "Yes" | Nonrecursive -> "No");
-  print_string "\n type: ";
-  print_string type_decl.ptype_name.txt;
-  (* TODO: To fix the issue with recursive types, pass in the rec_flag and use that to build an aux function which then becomes a subfunction to build the parent function.
-     I think the right approach after that is to pass down a list from the top level which tracks the types which are "true recursive" (and can expand as the functions nest deeper). That way we can actually know to call `dec_aux ()` in place of `dec` when we find the decoder for typ dec.
-  *)
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ ~true_recurse manifest
@@ -237,12 +220,21 @@ let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls
               (List.map
                  (fun cstr ->
                    let s = estring ~loc cstr.pcd_name.txt in
+                   let s_p = pstring ~loc cstr.pcd_name.txt in
                    if cstr.pcd_args = Pcstr_tuple [] then
                      let lid = lident_of_constructor_decl cstr in
                      let cstr =
                        Ast_builder.Default.pexp_construct ~loc lid None
                      in
-                     [%expr D.string [%e s] >>= succeed [%e cstr]]
+                     pexp_tuple ~loc
+                       [
+                         s;
+                         [%expr
+                           D.string >>= function
+                           | [%p s_p] -> succeed [%e cstr]
+                           | _ -> fail "Failure"];
+                         (* TODO better failure message *)
+                       ]
                    else
                      pexp_tuple ~loc
                        [
@@ -260,26 +252,6 @@ let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls
         [%expr
           let open D in
           [%e full_dec]]
-        (* in *)
-        (* let to_case cstr = *)
-        (*   let name = Ast_builder.Default.pstring ~loc cstr.pcd_name.txt in *)
-        (*   let dec_expr = expr_of_constr_decl ~true_recurse cstr in *)
-        (*   Ast_builder.Default.case ~lhs:name ~guard:None ~rhs:dec_expr *)
-        (* in *)
-        (* let cases = List.map to_case cstrs in *)
-        (* let fail_case = *)
-        (*   let var_p = Ast_builder.Default.pvar ~loc "s" in *)
-        (*   let var_e = Ast_builder.Default.evar ~loc "s" in *)
-        (*   Ast_builder.Default.case ~lhs:var_p ~guard:None *)
-        (*     ~rhs:[%expr fail ("Could not decode " ^ [%e var_e])] *)
-        (* in *)
-        (* let cases = cases @ [ fail_case ] in *)
-        (* let f = Ast_builder.Default.pexp_function ~loc cases in *)
-        (* let string_decoder = Ast_builder.Default.evar ~loc "D.string" in *)
-        (* [%expr *)
-        (*   let open D in *)
-        (*   let open D.Infix in *)
-        (*   [%e string_decoder] >>= [%e f]] *)
     | Ptype_record label_decs, _ -> expr_of_record ~true_recurse ~loc label_decs
     | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
     | _ -> Location.raise_errorf ~loc "Unhandled mystery"
