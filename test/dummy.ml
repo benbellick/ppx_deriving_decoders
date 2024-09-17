@@ -142,10 +142,65 @@ let _ =
 
 (* type int *)
 
-(* type a = { b : b option } *)
-(* and b = { a : a option } [@@deriving decoders] *)
+type a = { b : b option }
+and b = { a : a option }
 
-(* type c = { i : int; c : c option } *)
+let a_decoder b_decoder : a D.decoder =
+  let open D in
+  let* b = field "b" (D.nullable b_decoder) in
+  succeed { b }
+
+let b_decoder b_decoder : b D.decoder =
+  let open D in
+  let* a = field "a" (D.nullable (a_decoder b_decoder)) in
+  succeed { a }
+
+let b_decoder = D.fix b_decoder
+let a_decoder = a_decoder b_decoder
+
+let _ =
+  match D.decode_string a_decoder {|{"b": {"a": null}}|} with
+  | Ok { b = Some { a = None } } -> print_string "yuh"
+  | _ -> print_string "nuh"
+
+let _ =
+  match D.decode_string b_decoder {|{"a": {"b": null}}|} with
+  | Ok { a = Some { b = None } } -> print_string "yuh2"
+  | _ -> print_string "nuh2"
+
+type a1 = { l : b1 option; m : c1 option }
+and b1 = { n : c1 }
+and c1 = { o : a1 }
+
+let a1_decoder b1_decoder c1_decoder : a1 D.decoder =
+  let open D in
+  let* l = field "l" (D.nullable b1_decoder) in
+  let* m = field "m" (D.nullable c1_decoder) in
+  succeed { l; m }
+
+let b1_decoder c1_decoder : b1 D.decoder =
+  let open D in
+  let* n = field "n" c1_decoder in
+  succeed { n }
+
+let c1_decoder c1_decoder : c1 D.decoder =
+  let open D in
+  let b1_decoder = b1_decoder c1_decoder in
+  let a1_decoder = a1_decoder b1_decoder c1_decoder in
+  let* o = field "o" a1_decoder in
+  succeed { o }
+
+let c1_decoder = D.fix c1_decoder
+let b1_decoder = b1_decoder c1_decoder
+let a1_decoder = a1_decoder b1_decoder c1_decoder
+
+(* let b_decoder b_decoder : b D.decoder = *)
+(*   let open D in *)
+(*   let* a = field "a" (D.nullable (a_decoder b_decoder)) in *)
+(*   succeed { a } *)
+
+(* let b_decoder = D.fix b_decoder *)
+(* let a_decoder = a_decoder b_decoder *)
 
 (* (\* Decoder for type 'a' *\) *)
 
