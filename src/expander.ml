@@ -151,11 +151,10 @@ and expr_of_constr_decl ~true_recurse
 and expr_of_constr_arg ~loc ~cstr ~true_recurse (arg : constructor_arguments) =
   match arg with
   | Pcstr_tuple tups -> expr_of_tuple ~true_recurse ~lift:cstr ~loc tups
-  | Pcstr_record _ ->
-      (* TODO: This is an easy fix *)
-      Location.raise_errorf ~loc "Unhandled record in constr decl arg"
+  | Pcstr_record labl_decls ->
+      expr_of_record ~loc ~true_recurse ~lift:cstr labl_decls
 
-and expr_of_record ~loc ~true_recurse label_decls =
+and expr_of_record ~loc ~true_recurse ?lift label_decls =
   (* To help understand what this function is doing, imagine we had
      a type [type t = {i : int; s : string}]. Then this will render the decoder:
      let t_decoder : t D.decoder =
@@ -164,6 +163,14 @@ and expr_of_record ~loc ~true_recurse label_decls =
      let* i = field "i" int in
      let* s = field "s" string in
      succeed {i; s}
+
+     or optionally:
+     let t_decoder : t D.decoder =
+     let open D in
+     let open D.Infix in
+     let* i = field "i" int in
+     let* s = field "s" string in
+     succeed (lift {i; s})
   *)
   let base
       (* Consists of the initial setup partial function def, which is the inport and local definition,
@@ -197,7 +204,13 @@ and expr_of_record ~loc ~true_recurse label_decls =
       label_decls
   in
   let record = Ast_builder.Default.pexp_record ~loc var_names None in
-  complete_partial_expr [%expr succeed [%e record]]
+  match lift with
+  | None -> complete_partial_expr [%expr succeed [%e record]]
+  | Some lift ->
+      let record_lift =
+        Ast_builder.Default.pexp_construct ~loc lift (Some [%expr [%e record]])
+      in
+      complete_partial_expr [%expr succeed [%e record_lift]]
 
 let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls)
     : structure_item list =

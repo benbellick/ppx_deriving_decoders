@@ -31,6 +31,10 @@ type my_basic_cstr2 = Ints of int * int | Strs of string * string
 type colors = Red | Blue | Green [@@deriving decoders]
 type status = Online of int | Offline [@@deriving decoders]
 type my_list = Null | L of my_list [@@deriving decoders]
+type constr_w_rec = Empty | Item of { i : int } [@@deriving decoders]
+
+(* type a = { b : b option } *)
+(* and b = { a : a option } [@@deriving decoders] *)
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -154,4 +158,13 @@ let%test "my list" =
   &&
   match D.decode_string my_list_decoder {|{"L": ["Null"]}|} with
   | Ok (L Null) -> true
+  | _ -> false
+
+let%test "variant w/ record constructor" =
+  (match D.decode_string constr_w_rec_decoder {|"Empty"|} with
+  | Ok Empty -> true
+  | _ -> false)
+  &&
+  match D.decode_string constr_w_rec_decoder {|{"Item": {"i": -100}}|} with
+  | Ok (Item { i = -100 }) -> true
   | _ -> false
