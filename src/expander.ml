@@ -218,16 +218,6 @@ let implementation_generator ~(loc : location) ~rec_flag ~substitutions
     type_decl : expression =
   let rec_flag = really_recursive rec_flag [ type_decl ] in
   let name = to_decoder_name type_decl.ptype_name.txt in
-  (* let substitutions = *)
-  (*   match rec_flag with *)
-  (*   | Nonrecursive -> [] *)
-  (*   | Recursive -> *)
-  (*       [ *)
-  (*         ( core_type_of_type_declaration type_decl, *)
-  (*           Ast_builder.Default.evar ~loc *)
-  (*             (to_decoder_name type_decl.ptype_name.txt ^ "_aux") ); *)
-  (*       ] *)
-  (* in *)
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ ~substitutions manifest
@@ -297,56 +287,6 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
   in
   let name = to_decoder_name type_decl.ptype_name.txt in
   [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e imple]]
-
-(* let rec mutual_rec_fun_pats_gen ~loc (type_decls : type_declaration list) = *)
-(*   let open Ast_builder.Default in *)
-(*   match type_decls with *)
-(*   | [ type_decl ] -> *)
-(*       let dec_name = *)
-(*         evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt *)
-(*       in *)
-(*       let auto_arg = *)
-(*         (Nolabel, evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt) *)
-(*       in *)
-(*       [ pexp_apply ~loc dec_name [ auto_arg ] ] *)
-(*   | type_decl :: rest -> *)
-(*       let dec_name = *)
-(*         evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt *)
-(*       in *)
-(*       let args = *)
-(*         List.map *)
-(*           (fun type_decl -> *)
-(*             ( Nolabel, *)
-(*               evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt )) *)
-(*           rest *)
-(*       in *)
-(*       let dec_func_pattern = pexp_apply ~loc dec_name args in *)
-(*       dec_func_pattern :: mutual_rec_fun_pats_gen ~loc rest *)
-(*   | [] -> [] *)
-
-(* let rec mutual_rec_fun_imples_gen ~loc ~substitutions *)
-(*     (type_decls : type_declaration list) = *)
-(*   let open Ast_builder.Default in *)
-(*   match type_decls with *)
-(*   | type_decl :: rest -> *)
-(*       let imple = *)
-(*         implementation_generator ~loc ~rec_flag:Recursive ~substitutions *)
-(*           type_decl *)
-(*       in *)
-(*       let substi = *)
-(*         pexp_apply ~loc *)
-(*           (evar ~loc (to_decoder_name type_decl.ptype_name.txt)) *)
-(*           (List.map *)
-(*              (fun decl -> *)
-(*                (Nolabel, evar ~loc (to_decoder_name decl.ptype_name.txt))) *)
-(*              rest) *)
-(*       in *)
-(*       let new_substitution = *)
-(*         (core_type_of_type_declaration type_decl, substi) *)
-(*       in *)
-(*       let substitutions = new_substitution :: substitutions in *)
-(*       imple :: mutual_rec_fun_imples_gen ~loc ~substitutions rest *)
-(*   | [] -> [] *)
 
 let rec mutual_rec_fun_gen ~loc
     ~substitutions
@@ -425,17 +365,6 @@ let rec fix_mutual_rec_funs ~loc type_decls =
       let dec = [%stri let [%p var_p] = [%e appli]] in
       (* TODO: inefficient list append *)
       fix_mutual_rec_funs ~loc rest @ [ dec ]
-
-(* let mutual_rec_types_decoders_gen ~(loc : location) type_decls = *)
-(*   let fun_patters = mutual_rec_fun_pats_gen ~loc type_decls in *)
-(*   let fun_imples = *)
-(*     mutual_rec_fun_imples_gen ~loc ~substitutions:[] type_decls *)
-(*   in *)
-(*   let fun_blocks = CCList.combine fun_patters fun_imples in *)
-(*   CCList.map *)
-(*     (fun (pat, expr) -> Ast_builder.Default.value_binding ~loc ~pat ~expr) *)
-(*       (\* [%str let [%p pattern] = [%e imple]]) *\) *)
-(*     fun_blocks *)
 
 let str_gens ~(loc : location) ~(path : label)
     ((rec_flag : rec_flag), type_decls) : structure_item list =
