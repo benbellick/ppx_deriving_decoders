@@ -1,59 +1,27 @@
 module D = Decoders_yojson.Safe.Decode
 
-(* type my_list = Null | Some of my_list [@@deriving_inline decoders] *)
-
-(* let rec my_list_decoder = *)
-(*   D.one_of *)
-(*     [ *)
-(*       ( "Null", *)
-(*         let open D in *)
-(*         let open D.Infix in *)
-(*         D.string >>= function *)
-(*         | "Null" -> succeed Null *)
-(*         | e -> fail ("Could not decode " ^ e ^ " into " ^ "Null") ); *)
-(*       ( "Some", *)
-(*         D.field "Some" *)
-(*           (let open D in *)
-(*            let ( >>=:: ) fst rest = uncons rest fst in *)
-(*            my_list_decoder >>=:: fun arg0 -> succeed (Some arg0)) ); *)
-(*     ] *)
-
-(* let _ = my_list_decoder *)
-
-type my_list = Null | L of my_list (* [@@deriving_inline decoders] *)
+(* type my_list = Null | L of my_list [@@deriving_inline decoders] *)
 
 (* [@@@deriving.end] *)
 
-let my_list_decoder =
-  D.fix (fun my_list_decoder_aux ->
-      let open D in
-      one_of
-        [
-          ( "Null",
-            D.string >>= function "Null" -> succeed Null | _ -> fail "Failure"
-          );
-          ( "L",
-            D.field "L"
-              (let open D in
-               let ( >>=:: ) fst rest = uncons rest fst in
-               my_list_decoder_aux >>=:: fun arg0 -> succeed (L arg0)) );
-        ])
+(* let _ = fun (_ : my_list) -> () *)
 
-let _ =
-  match D.decode_string my_list_decoder {|{"L": ["Null"]}|} with
-  | Ok Null ->
-      print_string "We got Null\n";
-      true
-  | Ok (L Null) ->
-      print_string "We got L Null...\n";
-      true
-  | Ok _ ->
-      print_string "We got something else...\n";
-      true
-  | Error e ->
-      print_string "\n\n\n\n";
-      print_string (D.string_of_error e);
-      false
+(* let my_list_decoder = *)
+(*   D.fix (fun my_list_decoder_aux -> *)
+(*       let open D in *)
+(*       one_of *)
+(*         [ *)
+(*           ( "Null", *)
+(*             D.string >>= function "Null" -> succeed Null | _ -> fail "Failure" *)
+(*           ); *)
+(*           ( "L", *)
+(*             D.field "L" *)
+(*               (let open D in *)
+(*                let ( >>=:: ) fst rest = uncons rest fst in *)
+(*                my_list_aux >>=:: fun arg0 -> succeed (L arg0)) ); *)
+(*         ]) *)
+
+(* let _ = my_list_decoder *)
 
 (* type col = Blue | Red [@@deriving_inline decoders] *)
 
@@ -142,57 +110,76 @@ let _ =
 
 (* type int *)
 
-type a = { b : b option }
-and b = { a : a option }
+(* type a = { b : b option } *)
+(* and b = { a : a option } [@@deriving_inline decoders] *)
 
-let a_decoder b_decoder : a D.decoder =
-  let open D in
-  let* b = field "b" (D.nullable b_decoder) in
-  succeed { b }
+(* [@@@deriving.end] *)
 
-let b_decoder b_decoder : b D.decoder =
-  let open D in
-  let* a = field "a" (D.nullable (a_decoder b_decoder)) in
-  succeed { a }
+(* let a_decoder b_decoder = *)
+(*   let open D in *)
+(*   let open D.Infix in *)
+(*   let* b = field "b" (D.nullable b_decoder) in *)
+(*   succeed { b } *)
 
-let b_decoder = D.fix b_decoder
-let a_decoder = a_decoder b_decoder
+(* let _ = a_decoder *)
 
-let _ =
-  match D.decode_string a_decoder {|{"b": {"a": null}}|} with
-  | Ok { b = Some { a = None } } -> print_string "yuh"
-  | _ -> print_string "nuh"
+(* let b_decoder b_decoder = *)
+(*   let open D in *)
+(*   let open D.Infix in *)
+(*   let* a = field "a" (D.nullable (a_decoder b_decoder)) in *)
+(*   succeed { a } *)
 
-let _ =
-  match D.decode_string b_decoder {|{"a": {"b": null}}|} with
-  | Ok { a = Some { b = None } } -> print_string "yuh2"
-  | _ -> print_string "nuh2"
+(* let b_decoder = D.fix b_decoder *)
+(* let a_decoder = a_decoder b_decoder *)
 
-type a1 = { l : b1 option; m : c1 option }
-and b1 = { n : c1 }
-and c1 = { o : a1 }
+(* let a_decoder b_decoder : a D.decoder = *)
+(*   let open D in *)
+(*   let* b = field "b" (D.nullable b_decoder) in *)
+(*   succeed { b } *)
 
-let a1_decoder b1_decoder c1_decoder : a1 D.decoder =
-  let open D in
-  let* l = field "l" (D.nullable b1_decoder) in
-  let* m = field "m" (D.nullable c1_decoder) in
-  succeed { l; m }
+(* let b_decoder b_decoder : b D.decoder = *)
+(*   let open D in *)
+(*   let* a = field "a" (D.nullable (a_decoder b_decoder)) in *)
+(*   succeed { a } *)
 
-let b1_decoder c1_decoder : b1 D.decoder =
-  let open D in
-  let* n = field "n" c1_decoder in
-  succeed { n }
+(* let b_decoder = D.fix b_decoder *)
+(* let a_decoder = a_decoder b_decoder *)
 
-let c1_decoder c1_decoder : c1 D.decoder =
-  let open D in
-  let b1_decoder = b1_decoder c1_decoder in
-  let a1_decoder = a1_decoder b1_decoder c1_decoder in
-  let* o = field "o" a1_decoder in
-  succeed { o }
+(* let _ = *)
+(*   match D.decode_string a_decoder {|{"b": {"a": null}}|} with *)
+(*   | Ok { b = Some { a = None } } -> print_string "yuh" *)
+(*   | _ -> print_string "nuh" *)
 
-let c1_decoder = D.fix c1_decoder
-let b1_decoder = b1_decoder c1_decoder
-let a1_decoder = a1_decoder b1_decoder c1_decoder
+(* let _ = *)
+(*   match D.decode_string b_decoder {|{"a": {"b": null}}|} with *)
+(*   | Ok { a = Some { b = None } } -> print_string "yuh2" *)
+(*   | _ -> print_string "nuh2" *)
+
+(* type a1 = { l : b1 option; m : c1 option } *)
+(* and b1 = { n : c1 } *)
+(* and c1 = { o : a1 } *)
+
+(* let a1_decoder b1_decoder c1_decoder : a1 D.decoder = *)
+(*   let open D in *)
+(*   let* l = field "l" (D.nullable b1_decoder) in *)
+(*   let* m = field "m" (D.nullable c1_decoder) in *)
+(*   succeed { l; m } *)
+
+(* let b1_decoder c1_decoder : b1 D.decoder = *)
+(*   let open D in *)
+(*   let* n = field "n" c1_decoder in *)
+(*   succeed { n } *)
+
+(* let c1_decoder c1_decoder : c1 D.decoder = *)
+(*   let open D in *)
+(*   let b1_decoder = b1_decoder c1_decoder in *)
+(*   let a1_decoder = a1_decoder b1_decoder c1_decoder in *)
+(*   let* o = field "o" a1_decoder in *)
+(*   succeed { o } *)
+
+(* let c1_decoder = D.fix c1_decoder *)
+(* let b1_decoder = b1_decoder c1_decoder *)
+(* let a1_decoder = a1_decoder b1_decoder c1_decoder *)
 
 (* let b_decoder b_decoder : b D.decoder = *)
 (*   let open D in *)
