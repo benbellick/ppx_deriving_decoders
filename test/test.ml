@@ -36,8 +36,8 @@ type constr_w_rec = Empty | Item of { i : int } [@@deriving decoders]
 type a_non_rec = int * string
 and b_non_rec = bool [@@deriving decoders]
 
-(* type a = { b : b option } *)
-(* and b = { a : a option } [@@deriving decoders] *)
+type a_rec = { b : b_rec option }
+and b_rec = { a : a_rec option } [@@deriving decoders]
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -179,4 +179,16 @@ let%test "non-mutually-recursive and binding types" =
   &&
   match D.decode_string b_non_rec_decoder {|false|} with
   | Ok false -> true
+  | _ -> false
+
+let%test "mutually-recursive decoders" =
+  (match D.decode_string a_rec_decoder {|{"b" : null}|} with
+  | Ok { b = None } -> true
+  | _ -> false)
+  && (match D.decode_string a_rec_decoder {|{"b" : {"a": null}}|} with
+     | Ok { b = Some { a = None } } -> true
+     | _ -> false)
+  &&
+  match D.decode_string b_rec_decoder {|{"a" : {"b": null}}|} with
+  | Ok { a = Some { b = None } } -> true
   | _ -> false

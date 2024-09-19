@@ -348,7 +348,9 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
 (*       imple :: mutual_rec_fun_imples_gen ~loc ~substitutions rest *)
 (*   | [] -> [] *)
 
-let rec mutual_rec_fun_gen ~loc ~substitutions
+let rec mutual_rec_fun_gen ~loc
+    ~substitutions
+     (* These only generate the decoder in terms of one another, prior to utilizing `fix` *)
     (type_decls : type_declaration list) =
   let open Ast_builder.Default in
   match type_decls with
@@ -388,6 +390,42 @@ let rec mutual_rec_fun_gen ~loc ~substitutions
       dec :: mutual_rec_fun_gen ~loc ~substitutions rest
   | [] -> []
 
+let rec fix_mutual_rec_funs ~loc type_decls =
+  let open Ast_builder.Default in
+  match type_decls with
+  | [] -> []
+  | [ type_decl ] ->
+      let var_p =
+        pvar ~loc:type_decl.ptype_name.loc
+          (to_decoder_name type_decl.ptype_name.txt)
+      in
+      let var_e =
+        evar ~loc:type_decl.ptype_name.loc
+          (to_decoder_name type_decl.ptype_name.txt)
+      in
+      [ [%stri let [%p var_p] = D.fix [%e var_e]] ]
+  | type_decl :: rest ->
+      let var_p =
+        pvar ~loc:type_decl.ptype_name.loc
+          (to_decoder_name type_decl.ptype_name.txt)
+      in
+      let var_e =
+        evar ~loc:type_decl.ptype_name.loc
+          (to_decoder_name type_decl.ptype_name.txt)
+      in
+      let args =
+        List.map
+          (fun decl ->
+            ( Nolabel,
+              evar ~loc:decl.ptype_name.loc
+                (to_decoder_name decl.ptype_name.txt) ))
+          rest
+      in
+      let appli = pexp_apply ~loc var_e args in
+      let dec = [%stri let [%p var_p] = [%e appli]] in
+      (* TODO: inefficient list append *)
+      fix_mutual_rec_funs ~loc rest @ [ dec ]
+
 (* let mutual_rec_types_decoders_gen ~(loc : location) type_decls = *)
 (*   let fun_patters = mutual_rec_fun_pats_gen ~loc type_decls in *)
 (*   let fun_imples = *)
@@ -408,3 +446,4 @@ let str_gens ~(loc : location) ~(path : label)
   | Recursive, [ type_decl ] -> single_type_decoder_gen ~loc ~rec_flag type_decl
   | Recursive, _type_decls ->
       mutual_rec_fun_gen ~substitutions:[] ~loc type_decls
+      @ fix_mutual_rec_funs ~loc type_decls
