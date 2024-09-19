@@ -33,6 +33,9 @@ type status = Online of int | Offline [@@deriving decoders]
 type my_list = Null | L of my_list [@@deriving decoders]
 type constr_w_rec = Empty | Item of { i : int } [@@deriving decoders]
 
+type a_non_rec = int * string
+and b_non_rec = bool [@@deriving decoders]
+
 (* type a = { b : b option } *)
 (* and b = { a : a option } [@@deriving decoders] *)
 
@@ -167,4 +170,13 @@ let%test "variant w/ record constructor" =
   &&
   match D.decode_string constr_w_rec_decoder {|{"Item": {"i": -100}}|} with
   | Ok (Item { i = -100 }) -> true
+  | _ -> false
+
+let%test "non-mutually-recursive and binding types" =
+  (match D.decode_string a_non_rec_decoder {|[-254, "hello"]|} with
+  | Ok (-254, "hello") -> true
+  | _ -> false)
+  &&
+  match D.decode_string b_non_rec_decoder {|false|} with
+  | Ok false -> true
   | _ -> false

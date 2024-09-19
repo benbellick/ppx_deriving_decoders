@@ -212,11 +212,8 @@ and expr_of_record ~loc ~true_recurse ?lift label_decls =
       in
       complete_partial_expr [%expr succeed [%e record_lift]]
 
-let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls)
-    : structure_item list =
-  let rec_flag = really_recursive rec_flag type_decls in
-  let _path = path in
-  let type_decl = List.hd type_decls in
+let str_gen ~(loc : location) ~rec_flag type_decl : structure_item list =
+  let rec_flag = really_recursive rec_flag [ type_decl ] in
   let name = to_decoder_name type_decl.ptype_name.txt in
   let true_recurse =
     match rec_flag with
@@ -275,3 +272,11 @@ let str_gen ~(loc : location) ~(path : label) ((rec_flag : rec_flag), type_decls
     | Recursive -> wrap_as_aux ~loc ~name ~expr:imple_expr
   in
   [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e imple_expr]]
+
+let str_gens ~(loc : location) ~(path : label)
+    ((rec_flag : rec_flag), type_decls) : structure_item list =
+  let _path = path in
+  match (really_recursive rec_flag type_decls, type_decls) with
+  | Nonrecursive, _ -> List.(flatten (map (str_gen ~loc ~rec_flag) type_decls))
+  | Recursive, [ type_decl ] -> str_gen ~loc ~rec_flag type_decl
+  | Recursive, _ -> []
