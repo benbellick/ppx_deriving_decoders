@@ -19,6 +19,10 @@ let wrap_as_aux ~loc ~name ~expr =
   let aux_fn_p = pvar ~loc (name ^ "_aux") in
   [%expr D.fix (fun [%p aux_fn_p] -> [%e expr])]
 
+let pexp_fun_multiarg ~loc fun_imple (args : pattern list) =
+  let folder f arg = Ast_builder.Default.pexp_fun ~loc Nolabel None arg f in
+  List.fold_left folder fun_imple args
+
 let lident_of_constructor_decl (cd : constructor_declaration) =
   let loc = cd.pcd_name.loc in
   let name = cd.pcd_name.txt in
@@ -294,41 +298,81 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
   let name = to_decoder_name type_decl.ptype_name.txt in
   [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e imple]]
 
-let rec mutual_rec_fun_pats_gen ~loc (type_decls : type_declaration list) =
-  let open Ast_builder.Default in
-  match type_decls with
-  | [ type_decl ] ->
-      let dec_name =
-        evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt
-      in
-      let auto_arg =
-        (Nolabel, evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt)
-      in
-      [ pexp_apply ~loc dec_name [ auto_arg ] ]
-  | type_decl :: rest ->
-      let dec_name =
-        evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt
-      in
-      let args =
-        List.map
-          (fun type_decl ->
-            ( Nolabel,
-              evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt ))
-          rest
-      in
-      let dec_func_pattern = pexp_apply ~loc dec_name args in
-      dec_func_pattern :: mutual_rec_fun_pats_gen ~loc rest
-  | [] -> []
+(* let rec mutual_rec_fun_pats_gen ~loc (type_decls : type_declaration list) = *)
+(*   let open Ast_builder.Default in *)
+(*   match type_decls with *)
+(*   | [ type_decl ] -> *)
+(*       let dec_name = *)
+(*         evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt *)
+(*       in *)
+(*       let auto_arg = *)
+(*         (Nolabel, evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt) *)
+(*       in *)
+(*       [ pexp_apply ~loc dec_name [ auto_arg ] ] *)
+(*   | type_decl :: rest -> *)
+(*       let dec_name = *)
+(*         evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt *)
+(*       in *)
+(*       let args = *)
+(*         List.map *)
+(*           (fun type_decl -> *)
+(*             ( Nolabel, *)
+(*               evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt )) *)
+(*           rest *)
+(*       in *)
+(*       let dec_func_pattern = pexp_apply ~loc dec_name args in *)
+(*       dec_func_pattern :: mutual_rec_fun_pats_gen ~loc rest *)
+(*   | [] -> [] *)
 
-let rec mutual_rec_fun_imples_gen ~loc ~substitutions
+(* let rec mutual_rec_fun_imples_gen ~loc ~substitutions *)
+(*     (type_decls : type_declaration list) = *)
+(*   let open Ast_builder.Default in *)
+(*   match type_decls with *)
+(*   | type_decl :: rest -> *)
+(*       let imple = *)
+(*         implementation_generator ~loc ~rec_flag:Recursive ~substitutions *)
+(*           type_decl *)
+(*       in *)
+(*       let substi = *)
+(*         pexp_apply ~loc *)
+(*           (evar ~loc (to_decoder_name type_decl.ptype_name.txt)) *)
+(*           (List.map *)
+(*              (fun decl -> *)
+(*                (Nolabel, evar ~loc (to_decoder_name decl.ptype_name.txt))) *)
+(*              rest) *)
+(*       in *)
+(*       let new_substitution = *)
+(*         (core_type_of_type_declaration type_decl, substi) *)
+(*       in *)
+(*       let substitutions = new_substitution :: substitutions in *)
+(*       imple :: mutual_rec_fun_imples_gen ~loc ~substitutions rest *)
+(*   | [] -> [] *)
+
+let rec mutual_rec_fun_gen ~loc ~substitutions
     (type_decls : type_declaration list) =
   let open Ast_builder.Default in
   match type_decls with
   | type_decl :: rest ->
+      let var =
+        pvar ~loc:type_decl.ptype_name.loc
+          (to_decoder_name type_decl.ptype_name.txt)
+      in
       let imple =
         implementation_generator ~loc ~rec_flag:Recursive ~substitutions
           type_decl
       in
+      let args =
+        (* If we are on the last decoder, it needs to take itself in as a param *)
+        if rest = [] then [ var ]
+        else
+          List.map
+            (fun type_decl ->
+              let name = to_decoder_name type_decl.ptype_name.txt in
+              pvar ~loc:type_decl.ptype_name.loc name)
+            rest
+      in
+      let imple_as_lambda = pexp_fun_multiarg ~loc imple args in
+      let dec = [%stri let [%p var] = [%e imple_as_lambda]] in
       let substi =
         pexp_apply ~loc
           (evar ~loc (to_decoder_name type_decl.ptype_name.txt))
@@ -341,18 +385,19 @@ let rec mutual_rec_fun_imples_gen ~loc ~substitutions
         (core_type_of_type_declaration type_decl, substi)
       in
       let substitutions = new_substitution :: substitutions in
-      imple :: mutual_rec_fun_imples_gen ~loc ~substitutions rest
+      dec :: mutual_rec_fun_gen ~loc ~substitutions rest
   | [] -> []
 
-let mutual_rec_types_decoders_gen ~(loc : location) type_decls =
-  let fun_patters = mutual_rec_fun_pats_gen ~loc type_decls in
-  let fun_imples =
-    mutual_rec_fun_imples_gen ~loc ~substitutions:[] type_decls
-  in
-  let fun_blocks = CCList.combine fun_patters fun_imples in
-  CCList.map
-    (fun pattern imple -> [%str let [%p pattern] = [%e imple]])
-    fun_blocks
+(* let mutual_rec_types_decoders_gen ~(loc : location) type_decls = *)
+(*   let fun_patters = mutual_rec_fun_pats_gen ~loc type_decls in *)
+(*   let fun_imples = *)
+(*     mutual_rec_fun_imples_gen ~loc ~substitutions:[] type_decls *)
+(*   in *)
+(*   let fun_blocks = CCList.combine fun_patters fun_imples in *)
+(*   CCList.map *)
+(*     (fun (pat, expr) -> Ast_builder.Default.value_binding ~loc ~pat ~expr) *)
+(*       (\* [%str let [%p pattern] = [%e imple]]) *\) *)
+(*     fun_blocks *)
 
 let str_gens ~(loc : location) ~(path : label)
     ((rec_flag : rec_flag), type_decls) : structure_item list =
@@ -361,4 +406,5 @@ let str_gens ~(loc : location) ~(path : label)
   | Nonrecursive, _ ->
       List.(flatten (map (single_type_decoder_gen ~loc ~rec_flag) type_decls))
   | Recursive, [ type_decl ] -> single_type_decoder_gen ~loc ~rec_flag type_decl
-  | Recursive, _type_decls -> mutual_rec_types_decoders_gen ~loc type_decls
+  | Recursive, _type_decls ->
+      mutual_rec_fun_gen ~substitutions:[] ~loc type_decls
