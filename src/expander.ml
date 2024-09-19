@@ -297,6 +297,14 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
 let rec mutual_rec_fun_pats_gen ~loc (type_decls : type_declaration list) =
   let open Ast_builder.Default in
   match type_decls with
+  | [ type_decl ] ->
+      let dec_name =
+        evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt
+      in
+      let auto_arg =
+        (Nolabel, evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt)
+      in
+      [ pexp_apply ~loc dec_name [ auto_arg ] ]
   | type_decl :: rest ->
       let dec_name =
         evar ~loc:type_decl.ptype_name.loc type_decl.ptype_name.txt
@@ -310,18 +318,41 @@ let rec mutual_rec_fun_pats_gen ~loc (type_decls : type_declaration list) =
       in
       let dec_func_pattern = pexp_apply ~loc dec_name args in
       dec_func_pattern :: mutual_rec_fun_pats_gen ~loc rest
-  | _ -> []
+  | [] -> []
 
-(* let rec mutual_rec_fun_imples_gen ~loc ~substitutions *)
-(*     (type_decls : type_declaration list) = *)
-(*   let open Ast_builder.Default in *)
-(*   match type_decls with *)
-(*   | type_decl :: rest -> expr_of_typ type_decl ~substitutions *)
-(*   | _ -> _ *)
+let rec mutual_rec_fun_imples_gen ~loc ~substitutions
+    (type_decls : type_declaration list) =
+  let open Ast_builder.Default in
+  match type_decls with
+  | type_decl :: rest ->
+      let imple =
+        implementation_generator ~loc ~rec_flag:Recursive ~substitutions
+          type_decl
+      in
+      let substi =
+        pexp_apply ~loc
+          (evar ~loc (to_decoder_name type_decl.ptype_name.txt))
+          (List.map
+             (fun decl ->
+               (Nolabel, evar ~loc (to_decoder_name decl.ptype_name.txt)))
+             rest)
+      in
+      let new_substitution =
+        (core_type_of_type_declaration type_decl, substi)
+      in
+      let substitutions = new_substitution :: substitutions in
+      imple :: mutual_rec_fun_imples_gen ~loc ~substitutions rest
+  | [] -> []
 
-(* let mutual_rec_types_decoders_gen ~(loc : location) type_decls = *)
-(*   let fun_patters = mutual_rec_fun_pats_gen ~loc type_decls in *)
-(*   _ *)
+let mutual_rec_types_decoders_gen ~(loc : location) type_decls =
+  let fun_patters = mutual_rec_fun_pats_gen ~loc type_decls in
+  let fun_imples =
+    mutual_rec_fun_imples_gen ~loc ~substitutions:[] type_decls
+  in
+  let fun_blocks = CCList.combine fun_patters fun_imples in
+  CCList.map
+    (fun pattern imple -> [%str let [%p pattern] = [%e imple]])
+    fun_blocks
 
 let str_gens ~(loc : location) ~(path : label)
     ((rec_flag : rec_flag), type_decls) : structure_item list =
@@ -330,5 +361,4 @@ let str_gens ~(loc : location) ~(path : label)
   | Nonrecursive, _ ->
       List.(flatten (map (single_type_decoder_gen ~loc ~rec_flag) type_decls))
   | Recursive, [ type_decl ] -> single_type_decoder_gen ~loc ~rec_flag type_decl
-  | Recursive, _type_decls -> []
-(* mutual_rec_types_decoders_gen ~loc type_decls *)
+  | Recursive, _type_decls -> mutual_rec_types_decoders_gen ~loc type_decls
