@@ -39,6 +39,11 @@ and b_non_rec = bool [@@deriving decoders]
 type a_rec = { b : b_rec option }
 and b_rec = { a : a_rec option } [@@deriving decoders]
 
+(* More complex mutual recursive type *)
+type a1 = { l : b1 option; m : c1 option }
+and b1 = { n : c1 }
+and c1 = { o : a1 } [@@deriving decoders]
+
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
   | Ok i -> i = 1234
@@ -191,4 +196,16 @@ let%test "mutually-recursive decoders" =
   &&
   match D.decode_string b_rec_decoder {|{"a" : {"b": null}}|} with
   | Ok { a = Some { b = None } } -> true
+  | _ -> false
+
+let%test "complex mutually-recursive decoders" =
+  (match D.decode_string a1_decoder {|{"l" : null, "m": null}|} with
+  | Ok { l = None; m = None } -> true
+  | _ -> false)
+  &&
+  match
+    D.decode_string a1_decoder
+      {|{"l" : {"n": {"o": {"l": null, "m": null}}}, "m": null}|}
+  with
+  | Ok { l = Some { n = { o = { l = None; m = None } } }; m = None } -> true
   | _ -> false

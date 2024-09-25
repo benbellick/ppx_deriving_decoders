@@ -155,9 +155,32 @@ module D = Decoders_yojson.Safe.Decode
 (*   | Ok { a = Some { b = None } } -> print_string "yuh2" *)
 (*   | _ -> print_string "nuh2" *)
 
-(* type a1 = { l : b1 option; m : c1 option } *)
-(* and b1 = { n : c1 } *)
-(* and c1 = { o : a1 } *)
+type a1 = { l : b1 option; m : c1 option }
+and b1 = { n : c1 }
+and c1 = { o : a1 }
+
+let a1_decoder b1_decoder c1_decoder =
+  let open D in
+  let open D.Infix in
+  let* l = field "l" (D.nullable b1_decoder) in
+  let* m = field "m" (D.nullable c1_decoder) in
+  succeed { l; m }
+
+let b1_decoder c1_decoder =
+  let open D in
+  let open D.Infix in
+  let* n = field "n" c1_decoder in
+  succeed { n }
+
+let c1_decoder c1_decoder =
+  let open D in
+  let open D.Infix in
+  let* o = field "o" (a1_decoder (b1_decoder c1_decoder) c1_decoder) in
+  succeed { o }
+
+let c1_decoder = D.fix c1_decoder
+let b1_decoder = b1_decoder c1_decoder
+let a1_decoder = a1_decoder b1_decoder c1_decoder
 
 (* let a1_decoder b1_decoder c1_decoder : a1 D.decoder = *)
 (*   let open D in *)

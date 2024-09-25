@@ -1,7 +1,30 @@
 open Ppxlib
 module D = Decoders_yojson.Safe.Decode
 
+let apply_substitution ~orig ~substi =
+  let mapper =
+    object
+      inherit Ast_traverse.map as super
+
+      method! expression expr =
+        let eq e1 e2 =
+          (* TODO: terrible way to compare expressions *)
+          Pprintast.string_of_expression e1 = Pprintast.string_of_expression e2
+        in
+        if eq expr orig then substi else super#expression expr
+    end
+  in
+  mapper#expression
+
 let to_decoder_name i = i ^ "_decoder"
+
+let decoder_pvar_of_type_decl type_decl =
+  Ast_builder.Default.pvar ~loc:type_decl.ptype_name.loc
+    (to_decoder_name type_decl.ptype_name.txt)
+
+let decoder_evar_of_type_decl type_decl =
+  Ast_builder.Default.evar ~loc:type_decl.ptype_name.loc
+    (to_decoder_name type_decl.ptype_name.txt)
 
 (** We take an expr implementation with name NAME and turn it into:
     let rec NAME_AUX = fun () -> expr in NAME_AUX ().
@@ -20,13 +43,16 @@ let wrap_as_aux ~loc ~name ~expr =
   [%expr D.fix (fun [%p aux_fn_p] -> [%e expr])]
 
 let pexp_fun_multiarg ~loc fun_imple (args : pattern list) =
+  (* Making something like fun arg1 arg2 ... -> fun_imple *)
   let folder f arg = Ast_builder.Default.pexp_fun ~loc Nolabel None arg f in
-  List.fold_left folder fun_imple args
+  (* TODO: remove inefficient list reversal  *)
+  let args_rev = List.rev args in
+  CCList.fold_left folder fun_imple args_rev
 
 let lident_of_constructor_decl (cd : constructor_declaration) =
   let loc = cd.pcd_name.loc in
   let name = cd.pcd_name.txt in
-  Ast_builder.Default.Located.lident ~loc name (* Convert to lident *)
+  Ast_builder.Default.Located.lident ~loc name
 
 let rec expr_of_typ (typ : core_type)
     ~(substitutions : (core_type * expression) list) : expression =
@@ -326,7 +352,14 @@ let rec mutual_rec_fun_gen ~loc
       let new_substitution =
         (core_type_of_type_declaration type_decl, substi)
       in
-      let substitutions = new_substitution :: substitutions in
+      let updated_orig_substitutions =
+        let open CCList.Infix in
+        let+ typ, expr = substitutions in
+        let orig = decoder_evar_of_type_decl type_decl in
+        (typ, apply_substitution ~orig ~substi expr)
+      in
+
+      let substitutions = new_substitution :: updated_orig_substitutions in
       dec :: mutual_rec_fun_gen ~loc ~substitutions rest
   | [] -> []
 
@@ -335,31 +368,14 @@ let rec fix_mutual_rec_funs ~loc type_decls =
   match type_decls with
   | [] -> []
   | [ type_decl ] ->
-      let var_p =
-        pvar ~loc:type_decl.ptype_name.loc
-          (to_decoder_name type_decl.ptype_name.txt)
-      in
-      let var_e =
-        evar ~loc:type_decl.ptype_name.loc
-          (to_decoder_name type_decl.ptype_name.txt)
-      in
+      let var_p = decoder_pvar_of_type_decl type_decl in
+      let var_e = decoder_evar_of_type_decl type_decl in
       [ [%stri let [%p var_p] = D.fix [%e var_e]] ]
   | type_decl :: rest ->
-      let var_p =
-        pvar ~loc:type_decl.ptype_name.loc
-          (to_decoder_name type_decl.ptype_name.txt)
-      in
-      let var_e =
-        evar ~loc:type_decl.ptype_name.loc
-          (to_decoder_name type_decl.ptype_name.txt)
-      in
+      let var_p = decoder_pvar_of_type_decl type_decl in
+      let var_e = decoder_evar_of_type_decl type_decl in
       let args =
-        List.map
-          (fun decl ->
-            ( Nolabel,
-              evar ~loc:decl.ptype_name.loc
-                (to_decoder_name decl.ptype_name.txt) ))
-          rest
+        List.map (fun decl -> (Nolabel, decoder_evar_of_type_decl decl)) rest
       in
       let appli = pexp_apply ~loc var_e args in
       let dec = [%stri let [%p var_p] = [%e appli]] in
