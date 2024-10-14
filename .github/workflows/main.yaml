@@ -2,6 +2,15 @@ name: Build and test
 on: [push]
 jobs:
   build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.os }}    
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
