@@ -4,10 +4,10 @@ version: "0.1"
 synopsis: "Deriving Decoders using PPX"
 description:
   "Using mattjbray/ocaml-decoders, use a ppx to automatically generate instances of a decoder for a particular type using PPX."
-maintainer: ["Ben Bellick"]
-authors: ["Ben Bellick"]
+maintainer: ["Ben Bellick <benbellick@pm.me>"]
+authors: ["Ben Bellick <benbellick@pm.me>"]
 license: "MIT"
-tags: ["topics" "decoders" "decoding" "json" "ppx"]
+tags: ["decoders" "decoding" "json" "ppx"]
 homepage: "https://github.com/benbellick/ppx_deriving_decoders"
 doc: "https://github.com/benbellick/ppx_deriving_decoders"
 bug-reports: "https://github.com/benbellick/ppx_deriving_decoders/issues"
