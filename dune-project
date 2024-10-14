@@ -29,7 +29,7 @@
    decoders
    containers
   (decoders-yojson :with-test)
-  (ppx_inline_tests :with-test))
+  (ppx_inline_test :with-test))
  (tags
   (topics "decoders" "decoding" "json" "ppx")))
 
