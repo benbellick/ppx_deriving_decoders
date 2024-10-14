@@ -23,10 +23,10 @@
  (description "Using mattjbray/ocaml-decoders, use a ppx to automatically \
               generate instances of a decoder for a particular type using PPX.")
  (depends
-   (ocaml (>= 4.08.0))
+  (ocaml (>= 4.08.0))
    dune
    ppxlib
-   decoders
+  (decoders (>= v0.5.0))
    containers
   (decoders-yojson :with-test)
   (ppx_inline_test :with-test))
