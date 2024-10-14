@@ -4,6 +4,8 @@
 
 (generate_opam_files true)
 
+(version 0.1)
+
 (source
  (github benbellick/ppx_deriving_decoders))
 
