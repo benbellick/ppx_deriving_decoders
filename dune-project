@@ -11,7 +11,7 @@
 
 (maintainers "Ben Bellick")
 
-(license LICENSE)
+(license MIT)
 
 (documentation https://url/to/documentation)
 
@@ -19,7 +19,14 @@
  (name ppx_deriving_decoders)
  (synopsis "Deriving Decoders using PPX")
  (description "A longer description")
- (depends ocaml dune ppxlib decoders containers decoders-yojson)
+ (depends
+   ocaml
+   dune
+   ppxlib
+   decoders
+   containers
+  (decoders-yojson :with-test)
+  (inline_tests :with-test))
  (tags
   (topics "to describe" your project)))
 
