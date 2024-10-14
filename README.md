@@ -1,6 +1,6 @@
 # ppx_deriving_decoders: Automatically write mattjbray/ocaml-decoders
 
-mattjbray/ocaml-decoders is an excellent library for writing decoders using decoding combinators. However, writing out decoders by hand for more complicated types can be quite time-intensive. 
+[mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders) is an excellent library for writing decoders using decoding combinators. However, writing out decoders by hand for more complicated types can be quite time-intensive. 
 
 This library helps by automatically producing the appropriate decoder for a particular type. 
 
@@ -16,7 +16,7 @@ There are two primary ways in which this library can be of use. (More details of
 opam install ppx_deriving_decoders
 ```
 
-The implementation is agnostic to the underlying decoders backend. The only requirement is the presence of a module with the signature `Decoders.Decoder.S` as specified in mattjbray/ocaml-decoders, which is aliased to module `D`.
+The implementation is agnostic to the underlying decoders backend. The only requirement is the presence of a module with the signature [`Decoders.Decoder.S`](https://github.com/mattjbray/ocaml-decoders/blob/59c0dfbe6026af27fce96af82e650a875157385d/src/sig.ml#L8) as specified in [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders), which is aliased to module `D`.
 
 E.g., if you wanted to decode using `yojson`, you could use 
 ```
