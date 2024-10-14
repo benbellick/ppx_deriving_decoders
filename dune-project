@@ -13,12 +13,13 @@
 
 (license MIT)
 
-(documentation https://url/to/documentation)
+(documentation https://github.com/benbellick/ppx_deriving_decoders)
 
 (package
  (name ppx_deriving_decoders)
  (synopsis "Deriving Decoders using PPX")
- (description "A longer description")
+ (description "Using mattjbray/ocaml-decoders, use a ppx to automatically \
+              generate instances of a decoder for a particular type using PPX.")
  (depends
    ocaml
    dune
@@ -28,6 +29,5 @@
   (decoders-yojson :with-test)
   (inline_tests :with-test))
  (tags
-  (topics "to describe" your project)))
+  (topics "decoders" "decoding" "json" "ppx")))
 
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
