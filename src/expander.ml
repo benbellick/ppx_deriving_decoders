@@ -325,6 +325,24 @@ let rec mutual_rec_fun_gen ~loc
         pvar ~loc:type_decl.ptype_name.loc
           (to_decoder_name type_decl.ptype_name.txt)
       in
+      let substitutions =
+        match really_recursive Recursive [ type_decl ] with
+        | Recursive ->
+            let name = to_decoder_name type_decl.ptype_name.txt in
+            let substi = Ast_builder.Default.evar ~loc (name ^ "_aux") in
+            let new_substitution =
+              (core_type_of_type_declaration type_decl, substi)
+            in
+            (* TODO this should be bundled into a module *)
+            let updated_orig_substitutions =
+              let open CCList.Infix in
+              let+ typ, expr = substitutions in
+              let orig = decoder_evar_of_type_decl type_decl in
+              (typ, apply_substitution ~orig ~substi expr)
+            in
+            new_substitution :: updated_orig_substitutions
+        | Nonrecursive -> substitutions
+      in
       let imple =
         implementation_generator ~loc ~rec_flag:Recursive ~substitutions
           type_decl
@@ -352,6 +370,7 @@ let rec mutual_rec_fun_gen ~loc
       let new_substitution =
         (core_type_of_type_declaration type_decl, substi)
       in
+      (* TODO this should be bundled into a module *)
       let updated_orig_substitutions =
         let open CCList.Infix in
         let+ typ, expr = substitutions in

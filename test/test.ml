@@ -39,6 +39,54 @@ and b_non_rec = bool [@@deriving decoders]
 type a_rec = { b : b_rec option }
 and b_rec = { a : a_rec option } [@@deriving decoders]
 
+type bar = Int of int | String of string [@@deriving decoders]
+
+type expr = Num of int | BinOp of op * expr * expr
+and op = Add | Sub | Mul | Div [@@deriving_inline decoders]
+
+let _ = fun (_ : expr) -> ()
+let _ = fun (_ : op) -> ()
+
+let expr_decoder op_decoder =
+  D.fix (fun expr_decoder_aux ->
+      let open D in
+      one_of
+        [
+          ( "Num",
+            D.field "Num"
+              (let open D in
+               let ( >>=:: ) fst rest = uncons rest fst in
+               D.int >>=:: fun arg0 -> succeed (Num arg0)) );
+          ( "BinOp",
+            D.field "BinOp"
+              (let open D in
+               let ( >>=:: ) fst rest = uncons rest fst in
+               op_decoder >>=:: fun arg0 ->
+               expr_decoder_aux >>=:: fun arg1 ->
+               expr_decoder_aux >>=:: fun arg2 ->
+               succeed (BinOp (arg0, arg1, arg2))) );
+        ])
+
+let _ = expr_decoder
+
+let op_decoder op_decoder =
+  let open D in
+  one_of
+    [
+      ("Add", D.string >>= function "Add" -> succeed Add | _ -> fail "Failure");
+      ("Sub", D.string >>= function "Sub" -> succeed Sub | _ -> fail "Failure");
+      ("Mul", D.string >>= function "Mul" -> succeed Mul | _ -> fail "Failure");
+      ("Div", D.string >>= function "Div" -> succeed Div | _ -> fail "Failure");
+    ]
+
+let _ = op_decoder
+let op_decoder = D.fix op_decoder
+let _ = op_decoder
+let expr_decoder = expr_decoder op_decoder
+let _ = expr_decoder
+
+[@@@deriving.end]
+
 (* More complex mutual recursive type *)
 type a1 = { l : b1 option; m : c1 option }
 and b1 = { n : c1 }
