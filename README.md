@@ -9,6 +9,8 @@ There are two primary ways in which this library can be of use. (More details of
 1. "I want to write a (e.g. JSON) decoder for a particular type but don't care about the details" --> You can then use this library via `[@@deriving decoders]` applied to your types. 
 2. "I want to write a (e.g. JSON) decoder for a particular type, but I care a lot about how it works and just want a good starting place" --> You can use this library via `[@@deriving_inline decoders]` applied to your types to generate the implementation in place.
 
+> [!WARNING]
+> This is still a fairly experimental library. Use at your own risk! If you would like to use it and be extra safe, use approach 2 above, by using the library to generate boilerplate, but remove the dependency in production code. 
 
 ## Getting Started
 
