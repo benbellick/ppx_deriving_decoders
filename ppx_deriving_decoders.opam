@@ -18,7 +18,7 @@ depends: [
   "decoders"
   "containers"
   "decoders-yojson" {with-test}
-  "inline_tests" {with-test}
+  "ppx_inline_tests" {with-test}
   "odoc" {with-doc}
 ]
 build: [
