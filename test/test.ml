@@ -39,6 +39,11 @@ and b_non_rec = bool [@@deriving decoders]
 type a_rec = { b : b_rec option }
 and b_rec = { a : a_rec option } [@@deriving decoders]
 
+type bar = Int of int | String of string [@@deriving decoders]
+
+type expr = Num of int | BinOp of op * expr * expr
+and op = Add | Sub | Mul | Div [@@deriving decoders]
+
 (* More complex mutual recursive type *)
 type a1 = { l : b1 option; m : c1 option }
 and b1 = { n : c1 }
@@ -209,3 +214,19 @@ let%test "complex mutually-recursive decoders" =
   with
   | Ok { l = Some { n = { o = { l = None; m = None } } }; m = None } -> true
   | _ -> false
+
+let%test "expression mutually-recursive decoder" =
+  match
+    D.decode_string expr_decoder
+      {|{"BinOp" : [
+       "Add",
+       {"BinOp" : ["Div", {"Num": [10]}, {"Num": [5]}]},
+       {"BinOp" : ["Mul", {"Num": [10]}, {"Num": [3]}]}
+       ]}|}
+  with
+  | Ok (BinOp (Add, BinOp (Div, Num 10, Num 5), BinOp (Mul, Num 10, Num 3))) ->
+      true
+  | Ok _ -> false
+  | Error e ->
+      print_endline @@ D.string_of_error e;
+      false
