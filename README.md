@@ -1,7 +1,7 @@
 # ppx_deriving_decoders: Automatically write mattjbray/ocaml-decoders
 
 [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders) is an excellent library for writing decoders using decoding combinators. However, writing out decoders by hand for more complicated types can be quite time-intensive. 
-
+  
 This library helps by automatically producing the appropriate decoder for a particular type. 
 
 There are two primary ways in which this library can be of use. (More details of both follows.)
