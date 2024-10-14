@@ -10,7 +10,7 @@ There are two primary ways in which this library can be of use. (More details of
 2. "I want to write a (e.g. JSON) decoder for a particular type, but I care a lot about how it works and just want a good starting place" --> You can use this library via `[@@deriving_inline decoders]` applied to your types to generate the implementation in place.
 
 > [!WARNING]
-> This is still a fairly experimental library. Use at your own risk! If you would like to use it and be extra safe, use approach 2 above, by using the library to generate boilerplate, but remove the dependency in production code. 
+> This is still a fairly experimental library. Use at your own risk! If you would like to use it and be extra safe, use approach 2 above, by using the library to generate boilerplate and then removing the dependency in production code. 
 
 ## Getting Started
 
@@ -18,7 +18,7 @@ There are two primary ways in which this library can be of use. (More details of
 opam install ppx_deriving_decoders
 ```
 
-The implementation is agnostic to the underlying decoders backend. The only requirement is the presence of a module with the signature [`Decoders.Decode.S`](https://github.com/mattjbray/ocaml-decoders/blob/59c0dfbe6026af27fce96af82e650a875157385d/src/sig.ml#L8) as specified in [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders), which is aliased to module `D`.
+The implementation is agnostic to the underlying decoders back-end. The only requirement is the presence of a module with the signature [`Decoders.Decode.S`](https://github.com/mattjbray/ocaml-decoders/blob/59c0dfbe6026af27fce96af82e650a875157385d/src/sig.ml#L8) as specified in [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders), which is aliased to module `D`.
 
 E.g., if you wanted to decode using `yojson`, you could use 
 ```
@@ -35,12 +35,12 @@ Suppose we have the following file:
 type bar = Int of int | String of string
 ```
 
-To generate a decoder for `bar`, first add the preprocessing deriective to the appropriate dune file: 
+To generate a decoder for `bar`, first add the preprocessing directive to the appropriate dune file: 
 ```lisp
  (preprocess (pps ppx_deriving_decoders))
 ```
 
-Then just add an implementor of `Decoders.Decode.S` to the file, aliased to `D`, and add the deriving extension:
+Then just add an implementer of `Decoders.Decode.S` to the file, aliased to `D`, and add the deriving extension:
 ```ocaml
 (* In file foo.ml *)
 module D = Decoders_yojson.Safe.Decode
@@ -64,7 +64,7 @@ Suppose we have the same file again:
 
 type bar = Int of int | String of string
 ```
-To generate a decoder for `bar`, we again first add the preprocessing deriective to the appropriate dune file: 
+To generate a decoder for `bar`, we again first add the preprocessing directive to the appropriate dune file: 
 ```lisp
  (preprocess (pps ppx_deriving_decoders))
 ```
