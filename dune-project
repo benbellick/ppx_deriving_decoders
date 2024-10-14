@@ -26,7 +26,7 @@
   (ocaml (>= 4.08.0))
    dune
    ppxlib
-  (decoders (>= v0.5.0))
+  (decoders (>= 0.5.0))
    containers
   (decoders-yojson :with-test)
   (ppx_inline_test :with-test))
