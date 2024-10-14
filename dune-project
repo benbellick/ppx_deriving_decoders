@@ -9,9 +9,9 @@
 (source
  (github benbellick/ppx_deriving_decoders))
 
-(authors "Ben Bellick")
+(authors "Ben Bellick <benbellick@pm.me>")
 
-(maintainers "Ben Bellick")
+(maintainers "Ben Bellick <benbellick@pm.me>")
 
 (license MIT)
 
@@ -31,5 +31,5 @@
   (decoders-yojson :with-test)
   (ppx_inline_test :with-test))
  (tags
-  (topics "decoders" "decoding" "json" "ppx")))
+  ("decoders" "decoding" "json" "ppx")))
 
