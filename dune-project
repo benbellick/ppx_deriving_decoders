@@ -23,7 +23,7 @@
  (description "Using mattjbray/ocaml-decoders, use a ppx to automatically \
               generate instances of a decoder for a particular type using PPX.")
  (depends
-   ocaml
+   (ocaml (>= 4.08.0))
    dune
    ppxlib
    decoders
