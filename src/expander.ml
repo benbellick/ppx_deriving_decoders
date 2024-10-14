@@ -16,6 +16,37 @@ let apply_substitution ~orig ~substi =
   in
   mapper#expression
 
+let generate_attribute v ~loc =
+  let open Ast_builder.Default in
+  pstr_attribute ~loc
+    (attribute ~loc
+       ~name:(Located.mk ~loc "ocaml.warning")
+       ~payload:(PStr [ pstr_eval ~loc (estring ~loc v) [] ]))
+
+let suppress_warning_27 ~loc = generate_attribute ~loc "-27"
+let enforce_warning_27 ~loc = generate_attribute ~loc "+27"
+
+let wrap_27 xs =
+  (suppress_warning_27 ~loc:Location.none :: xs)
+  @ [ enforce_warning_27 ~loc:Location.none ]
+
+(* let suppress_warning_27 = *)
+(*   let suppress_warning_27 = *)
+(*     let loc = Location.none in *)
+(*     let payload = *)
+(*       PStr *)
+(*         [ *)
+(*           Ast_helper.Str.eval *)
+(*             (Ast_helper.Exp.constant (Pconst_string ("-27", loc, None))); *)
+(*         ] *)
+(*     in *)
+(*     let attr_name = "ocaml.warning"  *)
+
+(*   in *)
+(*   let attribute = Ast_builder.Default.attribute ~loc ~name:attr_name ~payload in *)
+(*   Ast_builder.Default.pstr_attribute ~loc attribute *)
+
+(* let enforce_warning_27 = _ *)
 let to_decoder_name i = i ^ "_decoder"
 
 let decoder_pvar_of_type_decl type_decl =
@@ -407,7 +438,9 @@ let str_gens ~(loc : location) ~(path : label)
   match (really_recursive rec_flag type_decls, type_decls) with
   | Nonrecursive, _ ->
       List.(flatten (map (single_type_decoder_gen ~loc ~rec_flag) type_decls))
-  | Recursive, [ type_decl ] -> single_type_decoder_gen ~loc ~rec_flag type_decl
+  | Recursive, [ type_decl ] ->
+      wrap_27 @@ single_type_decoder_gen ~loc ~rec_flag type_decl
   | Recursive, _type_decls ->
-      mutual_rec_fun_gen ~substitutions:[] ~loc type_decls
+      wrap_27
+      @@ mutual_rec_fun_gen ~substitutions:[] ~loc type_decls
       @ fix_mutual_rec_funs ~loc type_decls
