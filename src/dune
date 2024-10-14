@@ -1,7 +1,7 @@
 (library
  (name ppx_deriving_decoders)
  (public_name ppx_deriving_decoders)
- (libraries ppxlib decoders decoders-yojson containers)
+ (libraries ppxlib decoders containers)
  (preprocess
   (pps ppxlib.metaquot))
  (kind ppx_deriver))

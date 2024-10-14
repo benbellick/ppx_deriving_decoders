@@ -1,5 +1,4 @@
 open Ppxlib
-module D = Decoders_yojson.Safe.Decode
 
 let apply_substitution ~orig ~substi =
   let mapper =
