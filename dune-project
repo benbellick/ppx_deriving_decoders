@@ -27,7 +27,7 @@
    dune
    ppxlib
   (decoders (>= 0.5.0))
-   containers
+  (containers (>= 2.8))
   (decoders-yojson :with-test)
   (ppx_inline_test :with-test))
  (tags
