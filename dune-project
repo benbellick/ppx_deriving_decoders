@@ -25,7 +25,7 @@
  (depends
   (ocaml (>= 4.08.0))
    dune
-   ppxlib
+  (ppxlib (>= 0.20.0))
   (decoders (>= 0.5.0))
   (containers (>= 2.8))
   (decoders-yojson :with-test)
