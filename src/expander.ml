@@ -271,41 +271,27 @@ and expr_of_record ~loc ~substitutions ?lift label_decls =
       complete_partial_expr [%expr succeed [%e record_lift]]
 
 let expr_of_variant ~loc ~substitutions cstrs =
-  let constr_decs =
-    Ast_builder.Default.(
-      elist ~loc
-        (List.map
-           (fun cstr ->
-             let s = estring ~loc cstr.pcd_name.txt in
-             let s_p = pstring ~loc cstr.pcd_name.txt in
-             if cstr.pcd_args = Pcstr_tuple [] then
-               let lid = lident_of_constructor_decl cstr in
-               let cstr = Ast_builder.Default.pexp_construct ~loc lid None in
-               pexp_tuple ~loc
-                 [
-                   s;
-                   [%expr
-                     D.string >>= function
-                     | [%p s_p] -> succeed [%e cstr]
-                     | _ -> fail "Failure"];
-                   (* TODO better failure message *)
-                 ]
-             else
-               pexp_tuple ~loc
-                 [
-                   s;
-                   [%expr
-                     D.field [%e s] [%e expr_of_constr_decl ~substitutions cstr]];
-                 ])
-           cstrs))
+  let open Ast_builder.Default in
+  let match_all_case =
+    let match_all_pvar = pvar ~loc "any" in
+    let match_all_evar = evar ~loc "any" in
+    case ~lhs:match_all_pvar ~guard:None
+      ~rhs:
+        [%expr
+          D.fail @@ Printf.sprintf "Unrecognized field: %s" [%e match_all_evar]]
   in
-  let one_of_decoder = Ast_builder.Default.evar ~loc "one_of" in
-  let full_dec =
-    Ast_helper.Exp.apply ~loc one_of_decoder [ (Nolabel, constr_decs) ]
+  let to_case (cstr : constructor_declaration) =
+    let name_pattern = pstring ~loc cstr.pcd_name.txt in
+    let dec_expression = expr_of_constr_decl ~substitutions cstr in
+    case ~lhs:name_pattern ~guard:None ~rhs:dec_expression
   in
+
+  let cases = List.map to_case cstrs in
+  let cases = List.append cases [ match_all_case ] in
+  let decode_by_field = pexp_function ~loc cases in
   [%expr
     let open D in
-    [%e full_dec]]
+    single_field [%e decode_by_field]]
 
 let implementation_generator ~(loc : location) ~rec_flag ~substitutions
     type_decl : expression =
