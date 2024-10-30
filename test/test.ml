@@ -147,11 +147,11 @@ let%test "complex record" =
   | Error _ -> false
 
 let%test "simple constructor-less variant" =
-  (match D.decode_string colors_decoder {|"Red"|} with
+  (match D.decode_string colors_decoder {|{"Red": {}}|} with
   | Ok Red -> true
   | _ -> false)
   &&
-  match D.decode_string colors_decoder {|"Blue"|} with
+  match D.decode_string colors_decoder {|{"Blue": []}|} with
   | Ok Blue -> true
   | _ -> false
 
@@ -160,21 +160,21 @@ let%test "mixed constructor/less variant" =
   | Ok (Online 10) -> true
   | _ -> false)
   &&
-  match D.decode_string status_decoder {|"Offline"|} with
+  match D.decode_string status_decoder {|{"Offline": {}}|} with
   | Ok Offline -> true
   | _ -> false
 
 let%test "my list" =
-  (match D.decode_string my_list_decoder {|"Null"|} with
+  (match D.decode_string my_list_decoder {|{"Null": "doesn't matter"}|} with
   | Ok Null -> true
   | _ -> false)
   &&
-  match D.decode_string my_list_decoder {|{"L": ["Null"]}|} with
+  match D.decode_string my_list_decoder {|{"L": [{"Null": {}}]}|} with
   | Ok (L Null) -> true
   | _ -> false
 
 let%test "variant w/ record constructor" =
-  (match D.decode_string constr_w_rec_decoder {|"Empty"|} with
+  (match D.decode_string constr_w_rec_decoder {|{"Empty": null}|} with
   | Ok Empty -> true
   | _ -> false)
   &&
@@ -219,9 +219,9 @@ let%test "expression mutually-recursive decoder" =
   match
     D.decode_string expr_decoder
       {|{"BinOp" : [
-       "Add",
-       {"BinOp" : ["Div", {"Num": [10]}, {"Num": [5]}]},
-       {"BinOp" : ["Mul", {"Num": [10]}, {"Num": [3]}]}
+       {"Add": {}},
+       {"BinOp" : [{"Div": {}}, {"Num": [10]}, {"Num": [5]}]},
+       {"BinOp" : [{"Mul": {}}, {"Num": [10]}, {"Num": [3]}]}
        ]}|}
   with
   | Ok (BinOp (Add, BinOp (Div, Num 10, Num 5), BinOp (Mul, Num 10, Num 3))) ->

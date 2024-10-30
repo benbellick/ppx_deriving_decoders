@@ -88,17 +88,17 @@ type bar = Int of int | String of string [@@deriving_inline decoders]
 let _ = fun (_ : bar) -> ()
 let bar_decoder =
   let open D in
-    one_of
-      [("Int",
-         (D.field "Int"
-            (let open D in
-               let (>>=::) fst rest = uncons rest fst in
-               D.int >>=:: (fun arg0 -> succeed (Int arg0)))));
-      ("String",
-        (D.field "String"
-           (let open D in
-              let (>>=::) fst rest = uncons rest fst in
-              D.string >>=:: (fun arg0 -> succeed (String arg0)))))]
+    single_field
+      (function
+       | "Int" ->
+           let open D in
+             let (>>=::) fst rest = uncons rest fst in
+             D.int >>=:: ((fun arg0 -> succeed (Int arg0)))
+       | "String" ->
+           let open D in
+             let (>>=::) fst rest = uncons rest fst in
+             D.string >>=:: ((fun arg0 -> succeed (String arg0)))
+       | any -> D.fail @@ (Printf.sprintf "Unrecognized field: %s" any))
 let _ = bar_decoder
 [@@@deriving.end]
 ```
@@ -112,21 +112,16 @@ The following file:
 module D = Decoders_yojson.Safe.Decode
 
 type expr = Num of int | BinOp of op * expr * expr
-
-and op = Add | Sub | Mul | Div
+and op = Add | Sub | Mul | Div [@@deriving_inline decoders]
 
 [@@@deriving.end]
 ```
 after invoking `dune build --auto-promote` will yield:
 ```ocaml 
 (* In file foo.ml *)
-module D = Decoders_yojson.Safe.Decode
-
-type expr = Num of int | BinOp of op * expr * expr
-
-and op = Add | Sub | Mul | Div
-[@@deriving decoders] [@@deriving_inline decoders]
-
+ type expr = Num of int | BinOp of op * expr * expr
+ and op = Add | Sub | Mul | Div [@@deriving_inline decoders]
+ 
 let _ = fun (_ : expr) -> ()
 let _ = fun (_ : op) -> ()
 [@@@ocaml.warning "-27"]
@@ -134,39 +129,33 @@ let expr_decoder op_decoder =
   D.fix
     (fun expr_decoder_aux ->
        let open D in
-         one_of
-           [("Num",
-              (D.field "Num"
-                 (let open D in
-                    let (>>=::) fst rest = uncons rest fst in
-                    D.int >>=:: (fun arg0 -> succeed (Num arg0)))));
-           ("BinOp",
-             (D.field "BinOp"
-                (let open D in
-                   let (>>=::) fst rest = uncons rest fst in
-                   op_decoder >>=::
-                     (fun arg0 ->
+         single_field
+           (function
+            | "Num" ->
+                let open D in
+                  let (>>=::) fst rest = uncons rest fst in
+                  D.int >>=:: ((fun arg0 -> succeed (Num arg0)))
+            | "BinOp" ->
+                let open D in
+                  let (>>=::) fst rest = uncons rest fst in
+                  op_decoder >>=::
+                    ((fun arg0 ->
                         expr_decoder_aux >>=::
                           (fun arg1 ->
                              expr_decoder_aux >>=::
                                (fun arg2 ->
-                                  succeed (BinOp (arg0, arg1, arg2))))))))])
+                                  succeed (BinOp (arg0, arg1, arg2))))))
+            | any -> D.fail @@ (Printf.sprintf "Unrecognized field: %s" any)))
 let _ = expr_decoder
 let op_decoder op_decoder =
   let open D in
-    one_of
-      [("Add",
-         (D.string >>=
-            ((function | "Add" -> succeed Add | _ -> fail "Failure"))));
-      ("Sub",
-        (D.string >>=
-           ((function | "Sub" -> succeed Sub | _ -> fail "Failure"))));
-      ("Mul",
-        (D.string >>=
-           ((function | "Mul" -> succeed Mul | _ -> fail "Failure"))));
-      ("Div",
-        (D.string >>=
-           ((function | "Div" -> succeed Div | _ -> fail "Failure"))))]
+    single_field
+      (function
+       | "Add" -> succeed Add
+       | "Sub" -> succeed Sub
+       | "Mul" -> succeed Mul
+       | "Div" -> succeed Div
+       | any -> D.fail @@ (Printf.sprintf "Unrecognized field: %s" any))
 let _ = op_decoder
 let op_decoder = D.fix op_decoder
 let _ = op_decoder
