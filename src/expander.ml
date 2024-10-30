@@ -270,6 +270,43 @@ and expr_of_record ~loc ~substitutions ?lift label_decls =
       in
       complete_partial_expr [%expr succeed [%e record_lift]]
 
+let expr_of_variant ~loc ~substitutions cstrs =
+  let constr_decs =
+    Ast_builder.Default.(
+      elist ~loc
+        (List.map
+           (fun cstr ->
+             let s = estring ~loc cstr.pcd_name.txt in
+             let s_p = pstring ~loc cstr.pcd_name.txt in
+             if cstr.pcd_args = Pcstr_tuple [] then
+               let lid = lident_of_constructor_decl cstr in
+               let cstr = Ast_builder.Default.pexp_construct ~loc lid None in
+               pexp_tuple ~loc
+                 [
+                   s;
+                   [%expr
+                     D.string >>= function
+                     | [%p s_p] -> succeed [%e cstr]
+                     | _ -> fail "Failure"];
+                   (* TODO better failure message *)
+                 ]
+             else
+               pexp_tuple ~loc
+                 [
+                   s;
+                   [%expr
+                     D.field [%e s] [%e expr_of_constr_decl ~substitutions cstr]];
+                 ])
+           cstrs))
+  in
+  let one_of_decoder = Ast_builder.Default.evar ~loc "one_of" in
+  let full_dec =
+    Ast_helper.Exp.apply ~loc one_of_decoder [ (Nolabel, constr_decs) ]
+  in
+  [%expr
+    let open D in
+    [%e full_dec]]
+
 let implementation_generator ~(loc : location) ~rec_flag ~substitutions
     type_decl : expression =
   let rec_flag = really_recursive rec_flag [ type_decl ] in
@@ -277,45 +314,7 @@ let implementation_generator ~(loc : location) ~rec_flag ~substitutions
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ ~substitutions manifest
-    | Ptype_variant cstrs, None ->
-        let constr_decs =
-          Ast_builder.Default.(
-            elist ~loc
-              (List.map
-                 (fun cstr ->
-                   let s = estring ~loc cstr.pcd_name.txt in
-                   let s_p = pstring ~loc cstr.pcd_name.txt in
-                   if cstr.pcd_args = Pcstr_tuple [] then
-                     let lid = lident_of_constructor_decl cstr in
-                     let cstr =
-                       Ast_builder.Default.pexp_construct ~loc lid None
-                     in
-                     pexp_tuple ~loc
-                       [
-                         s;
-                         [%expr
-                           D.string >>= function
-                           | [%p s_p] -> succeed [%e cstr]
-                           | _ -> fail "Failure"];
-                         (* TODO better failure message *)
-                       ]
-                   else
-                     pexp_tuple ~loc
-                       [
-                         s;
-                         [%expr
-                           D.field [%e s]
-                             [%e expr_of_constr_decl ~substitutions cstr]];
-                       ])
-                 cstrs))
-        in
-        let one_of_decoder = Ast_builder.Default.evar ~loc "one_of" in
-        let full_dec =
-          Ast_helper.Exp.apply ~loc one_of_decoder [ (Nolabel, constr_decs) ]
-        in
-        [%expr
-          let open D in
-          [%e full_dec]]
+    | Ptype_variant cstrs, None -> expr_of_variant ~loc ~substitutions cstrs
     | Ptype_record label_decs, _ ->
         expr_of_record ~substitutions ~loc label_decs
     | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
