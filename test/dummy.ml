@@ -1,5 +1,13 @@
 module D = Decoders_yojson.Safe.Decode
 
+module Blah (E : Decoders.Encode.S) = struct
+  type int_wrap = int
+  and int_list = int list
+  and str = string
+  and int_str = int * string [@@deriving encoders]
+
+  [@@@deriving.end]
+end
 (* type my_list = Null | L of my_list [@@deriving_inline decoders] *)
 
 (* [@@@deriving.end] *)

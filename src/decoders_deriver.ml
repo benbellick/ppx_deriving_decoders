@@ -15,20 +15,6 @@ let apply_substitution ~orig ~substi =
   in
   mapper#expression
 
-let generate_attribute v ~loc =
-  let open Ast_builder.Default in
-  pstr_attribute ~loc
-    (attribute ~loc
-       ~name:(Located.mk ~loc "ocaml.warning")
-       ~payload:(PStr [ pstr_eval ~loc (estring ~loc v) [] ]))
-
-let suppress_warning_27 ~loc = generate_attribute ~loc "-27"
-let enforce_warning_27 ~loc = generate_attribute ~loc "+27"
-
-let wrap_27 xs =
-  (suppress_warning_27 ~loc:Location.none :: xs)
-  @ [ enforce_warning_27 ~loc:Location.none ]
-
 (* let suppress_warning_27 = *)
 (*   let suppress_warning_27 = *)
 (*     let loc = Location.none in *)
@@ -423,8 +409,8 @@ let str_gens ~(loc : location) ~(path : label)
   | Nonrecursive, _ ->
       List.(flatten (map (single_type_decoder_gen ~loc ~rec_flag) type_decls))
   | Recursive, [ type_decl ] ->
-      wrap_27 @@ single_type_decoder_gen ~loc ~rec_flag type_decl
+      Utils.wrap_27 @@ single_type_decoder_gen ~loc ~rec_flag type_decl
   | Recursive, _type_decls ->
-      wrap_27
+      Utils.wrap_27
       @@ mutual_rec_fun_gen ~substitutions:[] ~loc type_decls
       @ fix_mutual_rec_funs ~loc type_decls
