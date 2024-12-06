@@ -3,8 +3,7 @@ module D = Decoders_yojson.Safe.Decode
 module Blah (E : Decoders.Encode.S) = struct
   type int_wrap = int
   and int_list = int list
-  and str = string
-  and int_str = int * string [@@deriving encoders]
+  and str = string (* and int_str = int * string *) [@@deriving encoders]
 
   [@@@deriving.end]
 end

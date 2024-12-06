@@ -3,14 +3,12 @@
 module CompileTest (E : Decoders.Encode.S) = struct
   type int_wrap = int
   and int_list = int list
-
   and int_array = int array
-  (* and wrapped_int = { int : int } *) [@@deriving encoders]
-
-  [@@@deriving.end]
+  and wrapped_int = { int : int } [@@deriving encoders]
+  and wrapped_int_string = { i : int; s : string } [@@deriving encoders]
 end
 
 (* want it to look like *)
-module Encode (E : Decoders.Encode.S) = struct
-  int_array = E.obj [ ("int", E.int int) ]
-end
+(* module Encode (E : Decoders.Encode.S) = struct *)
+(*   int_array = E.obj [ ("int", E.int int) ] *)
+(* end *)
