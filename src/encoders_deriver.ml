@@ -63,11 +63,11 @@ and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
      fun (arg1,arg2,arg3) -> E.list E.value [E.a arg1; E.b arg2; E.c arg3]
   *)
   let typ_encoders_exprs = List.map expr_of_typ (* ~substitutions *) typs in
-  let pargs =
-    CCList.mapi
-      (fun idx _typ -> Ast_builder.Default.pvar ~loc @@ Utils.argn idx)
-      typs
-  in
+  (* let pargs = *)
+  (*   CCList.mapi *)
+  (*     (fun idx _typ -> Ast_builder.Default.pvar ~loc @@ Utils.argn idx) *)
+  (*     typs *)
+  (* in *)
   let eargs =
     CCList.mapi
       (fun idx _typ -> Ast_builder.Default.evar ~loc @@ Utils.argn idx)
@@ -79,9 +79,9 @@ and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
          (fun encoder arg -> [%expr [%e encoder] [%e arg]])
          typ_encoders_exprs eargs
   in
-  let encoder_arg = Ast_builder.Default.ppat_tuple ~loc pargs in
+  (* let encoder_arg = Ast_builder.Default.ppat_tuple ~loc pargs in *)
   let encoder_result = [%expr E.list E.value [%e encoded_args]] in
-  [%expr fun [%p encoder_arg] -> [%e encoder_result]]
+  [%expr [%e encoder_result]]
 (* [%expr [%e encoder_result]] *)
 
 and expr_of_record ~loc (* ~substitutions ?lift *) label_decls =
@@ -153,7 +153,7 @@ and expr_of_variant ~loc (* ~substitutions *) cstrs =
       | Pcstr_tuple [ _tuple ] -> Some (pvar ~loc (Utils.argn 0))
       | Pcstr_tuple tuples ->
           Some
-            (plist ~loc
+            (ppat_tuple ~loc
             @@ CCList.mapi (fun i _tup -> pvar ~loc (Utils.argn i)) tuples)
       | Pcstr_record lbl_decls ->
           Some
@@ -175,7 +175,21 @@ let implementation_generator ~(loc : location) ~rec_flag (* ~substitutions *)
   let _name = to_encoder_name type_decl.ptype_name.txt in
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
-    | Ptype_abstract, Some manifest -> expr_of_typ (* ~substitutions *) manifest
+    | Ptype_abstract, Some manifest -> (
+        let expr = expr_of_typ (* ~substitutions *) manifest in
+        match manifest with
+        | { ptyp_desc = Ptyp_tuple typs; _ } ->
+            (* In the case of a top level tuple, we need to explicitly wrap in a lambda with
+               the arguments
+            *)
+            let args =
+              Ast_builder.Default.ppat_tuple ~loc
+              @@ CCList.mapi
+                   (fun i _typ -> Ast_builder.Default.pvar ~loc (Utils.argn i))
+                   typs
+            in
+            [%expr fun [%p args] -> [%e expr]]
+        | _ -> expr)
     | Ptype_variant cstrs, None ->
         expr_of_variant ~loc (* ~substitutions *) cstrs
     | Ptype_record label_decs, _ ->
