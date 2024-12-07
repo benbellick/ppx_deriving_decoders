@@ -82,6 +82,7 @@ and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
   let encoder_arg = Ast_builder.Default.ppat_tuple ~loc pargs in
   let encoder_result = [%expr E.list E.value [%e encoded_args]] in
   [%expr fun [%p encoder_arg] -> [%e encoder_result]]
+(* [%expr [%e encoder_result]] *)
 
 and expr_of_record ~loc (* ~substitutions ?lift *) label_decls =
   (* To help understand what this function is doing, imagine we had
@@ -123,16 +124,18 @@ and expr_of_constr_arg ~loc (* ~cstr *)
 and expr_of_constr_decl (* ~substitutions *)
     ({ pcd_args; pcd_loc = loc; _ } as cstr_decl : constructor_declaration) =
   (* We assume at this point that the decomposition into indiviaul fields is handled by caller *)
-  if pcd_args = Pcstr_tuple [] then
-    let cstr = Utils.lident_of_constructor_decl cstr_decl in
-    let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
-    [%expr succeed [%e cstr]]
-  else
-    (* let cstr = Utils.lident_of_constructor_decl cstr_decl in *)
-    let sub_expr =
-      expr_of_constr_arg (* ~substitutions *) ~loc (* ~cstr *) pcd_args
-    in
-    sub_expr
+  let cstr_name = Ast_builder.Default.estring ~loc cstr_decl.pcd_name.txt in
+  let encoded_args =
+    match pcd_args with
+    | Pcstr_tuple [] -> [%expr E.null]
+    | Pcstr_tuple [ single ] ->
+        let enc = expr_of_typ single in
+        let on = Ast_builder.Default.evar ~loc (Utils.argn 0) in
+        [%expr [%e enc] [%e on]]
+    | _ -> expr_of_constr_arg (* ~substitutions *) ~loc (* ~cstr *) pcd_args
+  in
+
+  [%expr E.obj [ ([%e cstr_name], [%e encoded_args]) ]]
 
 and expr_of_variant ~loc (* ~substitutions *) cstrs =
   (* Producing from type `A | B of b | C of c`
@@ -147,6 +150,7 @@ and expr_of_variant ~loc (* ~substitutions *) cstrs =
     let inner_pattern =
       match cstr.pcd_args with
       | Pcstr_tuple [] -> None
+      | Pcstr_tuple [ _tuple ] -> Some (pvar ~loc (Utils.argn 0))
       | Pcstr_tuple tuples ->
           Some
             (plist ~loc
@@ -163,10 +167,7 @@ and expr_of_variant ~loc (* ~substitutions *) cstrs =
     case ~lhs:vpat ~guard:None ~rhs:enc_expression
   in
   let cases = List.map to_case cstrs in
-  let encode_by_field = pexp_function ~loc cases in
-  [%expr
-    let open E in
-    [%e encode_by_field]]
+  pexp_function ~loc cases
 
 let implementation_generator ~(loc : location) ~rec_flag (* ~substitutions *)
     type_decl : expression =

@@ -6,11 +6,7 @@ type int_array = int array [@@deriving encoders]
 type wrapped_int = { int : int } [@@deriving encoders]
 type wrapped_int_string = { i : int; s : string } [@@deriving encoders]
 type int_string = int * string [@@deriving encoders]
-
-type int_str_var = Int of int | Str of string | Nothing
-[@@deriving_inline encoders]
-
-[@@@deriving.end]
+type int_str_var = Int of int | Str of string | Nothing [@@deriving encoders]
 
 let%test "int_wrap" =
   match E.encode_string int_wrap_encoder 1234 with "1234" -> true | _ -> false
@@ -38,4 +34,16 @@ let%test "wrapped_int_string_string" =
 let%test "int_string" =
   match E.encode_string int_string_encoder (15, "the string") with
   | {|[15,"the string"]|} -> true
+  | _ -> false
+
+let%test "int_str_var" =
+  (match E.encode_string int_str_var_encoder (Int 10) with
+  | {|{"Int":10}|} -> true
+  | _ -> false)
+  && (match E.encode_string int_str_var_encoder (Str "something") with
+     | {|{"Str":"something"}|} -> true
+     | _ -> false)
+  &&
+  match E.encode_string int_str_var_encoder Nothing with
+  | {|{"Nothing":null}|} -> true
   | _ -> false
