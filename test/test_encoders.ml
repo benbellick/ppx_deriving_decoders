@@ -11,16 +11,9 @@ type vars =
   | Int of int
   | Str of string
   | Tup of int * string
-  (* | Rec of { i : int; s : string } *)
+  | Rec of { i : int; s : string }
   | Nothing
 [@@deriving encoders]
-
-let vars_encoder = function
-  | Int arg0 -> E.obj [ ("Int", E.int arg0) ]
-  | Str arg0 -> E.obj [ ("Str", E.string arg0) ]
-  | Tup (arg0, arg1) ->
-      E.obj [ ("Tup", E.list E.value [ E.int arg0; E.string arg1 ]) ]
-  | Nothing -> E.obj [ ("Nothing", E.null) ]
 
 let%test "int_wrap" =
   match E.encode_string int_wrap_encoder 1234 with "1234" -> true | _ -> false
@@ -59,6 +52,9 @@ let%test "vars" =
      | _ -> false)
   && (match E.encode_string vars_encoder (Tup (43, "another")) with
      | {|{"Tup":[43,"another"]}|} -> true
+     | _ -> false)
+  && (match E.encode_string vars_encoder (Rec { i = -43; s = "inner" }) with
+     | {|{"Rec":{"i":-43,"s":"inner"}}|} -> true
      | _ -> false)
   &&
   match E.encode_string vars_encoder Nothing with

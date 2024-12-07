@@ -90,15 +90,15 @@ and expr_of_record ~loc (* ~substitutions ?lift *) label_decls =
      let t_encoder : t E.encoder =
      fun {i; s} -> E.obj [("i", int i); ("s", string s)]
   *)
-  let arg_fields =
-    CCList.map
-      (fun { pld_name; _ } ->
-        ( { txt = Lident pld_name.txt; loc },
-          Ast_builder.Default.pvar ~loc (*TODO: is this right loc*) pld_name.txt
-        ))
-      label_decls
-  in
-  let parg = Ast_builder.Default.ppat_record ~loc arg_fields Closed in
+  (* let arg_fields = *)
+  (*   CCList.map *)
+  (*     (fun { pld_name; _ } -> *)
+  (*       ( { txt = Lident pld_name.txt; loc }, *)
+  (*         Ast_builder.Default.pvar ~loc (\*TODO: is this right loc*\) pld_name.txt *)
+  (*       )) *)
+  (*     label_decls *)
+  (* in *)
+  (* let parg = Ast_builder.Default.ppat_record ~loc arg_fields Closed in *)
   let encode_field { pld_name; pld_type; _ } =
     Ast_builder.Default.(
       pexp_tuple ~loc
@@ -112,7 +112,7 @@ and expr_of_record ~loc (* ~substitutions ?lift *) label_decls =
     eapply ~loc (evar ~loc "E.obj")
     @@ [ elist ~loc (CCList.map encode_field label_decls) ]
   in
-  Ast_builder.Default.pexp_fun ~loc Nolabel None parg encode_all
+  encode_all
 
 and expr_of_constr_arg ~loc (* ~cstr *)
     (* ~substitutions *) (arg : constructor_arguments) =
@@ -156,10 +156,17 @@ and expr_of_variant ~loc (* ~substitutions *) cstrs =
             (ppat_tuple ~loc
             @@ CCList.mapi (fun i _tup -> pvar ~loc (Utils.argn i)) tuples)
       | Pcstr_record lbl_decls ->
-          Some
-            (plist ~loc
-            @@ CCList.mapi (fun i _decl -> pvar ~loc (Utils.argn i)) lbl_decls)
+          let arg_fields =
+            CCList.map
+              (fun { pld_name; _ } ->
+                ( { txt = Lident pld_name.txt; loc },
+                  Ast_builder.Default.pvar ~loc
+                    (*TODO: is this right loc*) pld_name.txt ))
+              lbl_decls
+          in
+          Some (Ast_builder.Default.ppat_record ~loc arg_fields Closed)
     in
+
     let vpat =
       ppat_construct ~loc (Utils.lident_of_constructor_decl cstr) inner_pattern
     in
@@ -193,7 +200,18 @@ let implementation_generator ~(loc : location) ~rec_flag (* ~substitutions *)
     | Ptype_variant cstrs, None ->
         expr_of_variant ~loc (* ~substitutions *) cstrs
     | Ptype_record label_decs, _ ->
-        expr_of_record (* ~substitutions *) ~loc label_decs
+        (* And in the case of a top-level record, we also need to explicitly wrap in a lambda with args *)
+        let arg_fields =
+          CCList.map
+            (fun { pld_name; _ } ->
+              ( { txt = Lident pld_name.txt; loc },
+                Ast_builder.Default.pvar ~loc
+                  (*TODO: is this right loc*) pld_name.txt ))
+            label_decs
+        in
+        let args = Ast_builder.Default.ppat_record ~loc arg_fields Closed in
+        let expr = expr_of_record (* ~substitutions *) ~loc label_decs in
+        [%expr fun [%p args] -> [%e expr]]
     | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
     | _ -> Location.raise_errorf ~loc "Unhandled mystery"
   in
