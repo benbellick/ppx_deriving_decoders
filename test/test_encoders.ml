@@ -5,6 +5,7 @@ type int_list = int list [@@deriving encoders]
 type int_array = int array [@@deriving encoders]
 type wrapped_int = { int : int } [@@deriving encoders]
 type wrapped_int_string = { i : int; s : string } [@@deriving encoders]
+type int_string = int * string [@@deriving encoders]
 
 let%test "int_wrap" =
   match E.encode_string int_wrap_encoder 1234 with "1234" -> true | _ -> false
@@ -27,4 +28,9 @@ let%test "wrapped_int" =
 let%test "wrapped_int_string_string" =
   match E.encode_string wrapped_int_string_encoder { i = -10; s = "super" } with
   | {|{"i":-10,"s":"super"}|} -> true
+  | _ -> false
+
+let%test "int_string" =
+  match E.encode_string int_string_encoder (15, "the string") with
+  | {|[15,"the string"]|} -> true
   | _ -> false

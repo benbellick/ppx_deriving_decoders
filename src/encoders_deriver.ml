@@ -35,11 +35,8 @@ let rec expr_of_typ (typ : core_type) : expression =
       let opt_decoder = Ast_builder.Default.evar ~loc "E.nullable" in
       let sub_expr = expr_of_typ (* ~substitutions *) inner_typ in
       Ast_helper.Exp.apply ~loc opt_decoder [ (Nolabel, sub_expr) ]
-  | { ptyp_desc = Ptyp_tuple _typs; _ } -> failwith "NYI tuples"
-  (* The difficulty here is how to encode a tuple into a list of things whose indivudal parts are different.
-     Feel like we need an uncons function or something for encoders.
-  *)
-  (* expr_of_tuple (\* ~substitutions *\) ~loc typs *)
+  | { ptyp_desc = Ptyp_tuple typs; _ } ->
+      expr_of_tuple (* ~substitutions *) ~loc typs
   (* | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc; _ } -> _ *)
   (* | { ptyp_desc = Ptyp_alias _; _ } -> *)
   (*     failwith *)
@@ -74,7 +71,7 @@ and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
     CCList.mapi (fun idx _typ -> Ast_builder.Default.evar ~loc @@ argn idx) typs
   in
   let encoded_args =
-    Ast_builder.Default.pexp_tuple ~loc
+    Ast_builder.Default.elist ~loc
     @@ CCList.map2
          (fun encoder arg -> [%expr [%e encoder] [%e arg]])
          typ_encoders_exprs eargs
