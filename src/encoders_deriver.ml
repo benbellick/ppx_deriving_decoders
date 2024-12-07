@@ -62,13 +62,16 @@ and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
   (* Want to take type a * b * c  and produce
      fun (arg1,arg2,arg3) -> E.list E.value [E.a arg1; E.b arg2; E.c arg3]
   *)
-  let argn = Printf.sprintf "arg%d" in
   let typ_encoders_exprs = List.map expr_of_typ (* ~substitutions *) typs in
   let pargs =
-    CCList.mapi (fun idx _typ -> Ast_builder.Default.pvar ~loc @@ argn idx) typs
+    CCList.mapi
+      (fun idx _typ -> Ast_builder.Default.pvar ~loc @@ Utils.argn idx)
+      typs
   in
   let eargs =
-    CCList.mapi (fun idx _typ -> Ast_builder.Default.evar ~loc @@ argn idx) typs
+    CCList.mapi
+      (fun idx _typ -> Ast_builder.Default.evar ~loc @@ Utils.argn idx)
+      typs
   in
   let encoded_args =
     Ast_builder.Default.elist ~loc
@@ -110,6 +113,61 @@ and expr_of_record ~loc (* ~substitutions ?lift *) label_decls =
   in
   Ast_builder.Default.pexp_fun ~loc Nolabel None parg encode_all
 
+and expr_of_constr_arg ~loc (* ~cstr *)
+    (* ~substitutions *) (arg : constructor_arguments) =
+  match arg with
+  | Pcstr_tuple tups -> expr_of_tuple (* ~substitutions ~lift:cstr *) ~loc tups
+  | Pcstr_record labl_decls ->
+      expr_of_record ~loc (* ~substitutions ~lift:cstr *) labl_decls
+
+and expr_of_constr_decl (* ~substitutions *)
+    ({ pcd_args; pcd_loc = loc; _ } as cstr_decl : constructor_declaration) =
+  (* We assume at this point that the decomposition into indiviaul fields is handled by caller *)
+  if pcd_args = Pcstr_tuple [] then
+    let cstr = Utils.lident_of_constructor_decl cstr_decl in
+    let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
+    [%expr succeed [%e cstr]]
+  else
+    (* let cstr = Utils.lident_of_constructor_decl cstr_decl in *)
+    let sub_expr =
+      expr_of_constr_arg (* ~substitutions *) ~loc (* ~cstr *) pcd_args
+    in
+    sub_expr
+
+and expr_of_variant ~loc (* ~substitutions *) cstrs =
+  (* Producing from type `A | B of b | C of c`
+     to
+     function
+     | A -> {"A":null}
+     | B b -> {"B": b_encoder b}
+     | C c - {"C": c_encoder c}
+  *)
+  let open Ast_builder.Default in
+  let to_case (cstr : constructor_declaration) =
+    let inner_pattern =
+      match cstr.pcd_args with
+      | Pcstr_tuple [] -> None
+      | Pcstr_tuple tuples ->
+          Some
+            (plist ~loc
+            @@ CCList.mapi (fun i _tup -> pvar ~loc (Utils.argn i)) tuples)
+      | Pcstr_record lbl_decls ->
+          Some
+            (plist ~loc
+            @@ CCList.mapi (fun i _decl -> pvar ~loc (Utils.argn i)) lbl_decls)
+    in
+    let vpat =
+      ppat_construct ~loc (Utils.lident_of_constructor_decl cstr) inner_pattern
+    in
+    let enc_expression = expr_of_constr_decl (* ~substitutions *) cstr in
+    case ~lhs:vpat ~guard:None ~rhs:enc_expression
+  in
+  let cases = List.map to_case cstrs in
+  let encode_by_field = pexp_function ~loc cases in
+  [%expr
+    let open E in
+    [%e encode_by_field]]
+
 let implementation_generator ~(loc : location) ~rec_flag (* ~substitutions *)
     type_decl : expression =
   let rec_flag = really_recursive rec_flag [ type_decl ] in
@@ -117,8 +175,8 @@ let implementation_generator ~(loc : location) ~rec_flag (* ~substitutions *)
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ (* ~substitutions *) manifest
-    | Ptype_variant _cstrs, None ->
-        failwith "NYI" (* expr_of_variant ~loc ~substitutions cstrs *)
+    | Ptype_variant cstrs, None ->
+        expr_of_variant ~loc (* ~substitutions *) cstrs
     | Ptype_record label_decs, _ ->
         expr_of_record (* ~substitutions *) ~loc label_decs
     | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"

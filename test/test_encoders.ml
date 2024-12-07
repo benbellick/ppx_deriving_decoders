@@ -7,6 +7,11 @@ type wrapped_int = { int : int } [@@deriving encoders]
 type wrapped_int_string = { i : int; s : string } [@@deriving encoders]
 type int_string = int * string [@@deriving encoders]
 
+type int_str_var = Int of int | Str of string | Nothing
+[@@deriving_inline encoders]
+
+[@@@deriving.end]
+
 let%test "int_wrap" =
   match E.encode_string int_wrap_encoder 1234 with "1234" -> true | _ -> false
 

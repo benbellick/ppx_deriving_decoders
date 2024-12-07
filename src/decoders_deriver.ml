@@ -65,11 +65,6 @@ let pexp_fun_multiarg ~loc fun_imple (args : pattern list) =
   let args_rev = List.rev args in
   CCList.fold_left folder fun_imple args_rev
 
-let lident_of_constructor_decl (cd : constructor_declaration) =
-  let loc = cd.pcd_name.loc in
-  let name = cd.pcd_name.txt in
-  Ast_builder.Default.Located.lident ~loc name
-
 let rec expr_of_typ (typ : core_type)
     ~(substitutions : (core_type * expression) list) : expression =
   let loc = { typ.ptyp_loc with loc_ghost = true } in
@@ -141,7 +136,6 @@ and expr_of_tuple ~loc ~substitutions ?lift typs =
      string >>=:: fun arg2 ->
      bool >>=:: fun arg3 -> succeed (lift (arg1, arg2, arg3))
   *)
-  let argn = Printf.sprintf "arg%d" in
   let typ_decoder_exprs = List.map (expr_of_typ ~substitutions) typs in
   let base =
     (* Consists of the initial setup partial function def, which is the inport and local definition,
@@ -154,7 +148,7 @@ and expr_of_tuple ~loc ~substitutions ?lift typs =
       0 )
   in
   let fn_builder (partial_expr, i) next_decoder =
-    let var = argn i in
+    let var = Utils.argn i in
     let var_pat = Ast_builder.Default.pvar ~loc var in
     ( (fun body ->
         partial_expr
@@ -164,7 +158,7 @@ and expr_of_tuple ~loc ~substitutions ?lift typs =
   let complete_partial_expr, var_count =
     List.fold_left fn_builder base typ_decoder_exprs
   in
-  let var_names = CCList.init var_count argn in
+  let var_names = CCList.init var_count Utils.argn in
   let var_tuple =
     let expr_list =
       List.map (fun s -> [%expr [%e Ast_builder.Default.evar ~loc s]]) var_names
@@ -184,11 +178,11 @@ and expr_of_constr_decl ~substitutions
     ({ pcd_args; pcd_loc = loc; _ } as cstr_decl : constructor_declaration) =
   (* We assume at this point that the decomposition into indiviaul fields is handled by caller *)
   if pcd_args = Pcstr_tuple [] then
-    let cstr = lident_of_constructor_decl cstr_decl in
+    let cstr = Utils.lident_of_constructor_decl cstr_decl in
     let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
     [%expr succeed [%e cstr]]
   else
-    let cstr = lident_of_constructor_decl cstr_decl in
+    let cstr = Utils.lident_of_constructor_decl cstr_decl in
     let sub_expr = expr_of_constr_arg ~substitutions ~loc ~cstr pcd_args in
     sub_expr
 
