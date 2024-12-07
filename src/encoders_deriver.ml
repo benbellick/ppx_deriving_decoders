@@ -61,25 +61,27 @@ let rec expr_of_typ (typ : core_type) : expression =
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)
 
-(* TODO: revisit *)
-(* and expr_of_tuple ~loc (\* ~substitutions ?lift *\) typs = *)
-(*   (\* Want to take type a * b * c  and produce *)
-(*      fun (arg1,arg2,arg3) -> E.list [("a", E.a arg1); ("b", E.b arg2); "c" E.c arg3] *)
-(*   *\) *)
-(*   let argn = Printf.sprintf "arg%d" in *)
-(*   let typ_encoders_exprs = List.map expr_of_typ (\* ~substitutions *\) typs in *)
-(*   let args = *)
-(*     CCList.mapi (fun idx _typ -> Ast_builder.Default.evar ~loc @@ argn idx) typs *)
-(*   in *)
-(*   let encoded_args = *)
-(*     CCList.map2 *)
-(*       (fun encoder arg -> [%expr [%e encoder] [%e arg]]) *)
-(*       typ_encoders_exprs args *)
-(*   in *)
-(*   let typ_names = CCList.map (fun core_type -> core_type) typs in *)
-
-(*   let encoder_arg = Ast_builder.Default.pexp_tuple ~loc args in *)
-(*   (\* let encoder_result = [%expr E.list *\) _ *)
+and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
+  (* Want to take type a * b * c  and produce
+     fun (arg1,arg2,arg3) -> E.list E.value [E.a arg1; E.b arg2; E.c arg3]
+  *)
+  let argn = Printf.sprintf "arg%d" in
+  let typ_encoders_exprs = List.map expr_of_typ (* ~substitutions *) typs in
+  let pargs =
+    CCList.mapi (fun idx _typ -> Ast_builder.Default.pvar ~loc @@ argn idx) typs
+  in
+  let eargs =
+    CCList.mapi (fun idx _typ -> Ast_builder.Default.evar ~loc @@ argn idx) typs
+  in
+  let encoded_args =
+    Ast_builder.Default.pexp_tuple ~loc
+    @@ CCList.map2
+         (fun encoder arg -> [%expr [%e encoder] [%e arg]])
+         typ_encoders_exprs eargs
+  in
+  let encoder_arg = Ast_builder.Default.ppat_tuple ~loc pargs in
+  let encoder_result = [%expr E.list E.value [%e encoded_args]] in
+  [%expr fun [%p encoder_arg] -> [%e encoder_result]]
 
 and expr_of_record ~loc (* ~substitutions ?lift *) label_decls =
   (* To help understand what this function is doing, imagine we had

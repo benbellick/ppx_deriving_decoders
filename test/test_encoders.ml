@@ -1,14 +1,30 @@
-(* Since I don't have WIFI and don't have an encoder implementation installed, I'm temporarily just checking for compilation *)
+module E = Decoders_yojson.Safe.Encode
 
-module CompileTest (E : Decoders.Encode.S) = struct
-  type int_wrap = int
-  and int_list = int list
-  and int_array = int array
-  and wrapped_int = { int : int } [@@deriving encoders]
-  and wrapped_int_string = { i : int; s : string } [@@deriving encoders]
-end
+type int_wrap = int [@@deriving encoders]
+type int_list = int list [@@deriving encoders]
+type int_array = int array [@@deriving encoders]
+type wrapped_int = { int : int } [@@deriving encoders]
+type wrapped_int_string = { i : int; s : string } [@@deriving encoders]
 
-(* want it to look like *)
-(* module Encode (E : Decoders.Encode.S) = struct *)
-(*   int_array = E.obj [ ("int", E.int int) ] *)
-(* end *)
+let%test "int_wrap" =
+  match E.encode_string int_wrap_encoder 1234 with "1234" -> true | _ -> false
+
+let%test "int_list" =
+  match E.encode_string int_list_encoder [ 1; 2; 3; 4 ] with
+  | {|[1,2,3,4]|} -> true
+  | _ -> false
+
+let%test "int_array" =
+  match E.encode_string int_array_encoder [| 1; 2; 3; 4 |] with
+  | {|[1,2,3,4]|} -> true
+  | _ -> false
+
+let%test "wrapped_int" =
+  match E.encode_string wrapped_int_encoder { int = 101 } with
+  | {|{"int":101}|} -> true
+  | _ -> false
+
+let%test "wrapped_int_string_string" =
+  match E.encode_string wrapped_int_string_encoder { i = -10; s = "super" } with
+  | {|{"i":-10,"s":"super"}|} -> true
+  | _ -> false
