@@ -6,6 +6,10 @@ type int_array = int array [@@deriving encoders]
 type wrapped_int = { int : int } [@@deriving encoders]
 type wrapped_int_string = { i : int; s : string } [@@deriving encoders]
 type int_string = int * string [@@deriving encoders]
+type basic_recur = Empty | Rec of basic_recur [@@deriving encoders]
+
+type expr = Num of int | BinOp of op * expr * expr
+and op = Add | Sub | Mul | Div [@@deriving encoders]
 
 type vars =
   | Int of int
@@ -59,4 +63,9 @@ let%test "vars" =
   &&
   match E.encode_string vars_encoder Nothing with
   | {|{"Nothing":null}|} -> true
+  | _ -> false
+
+let%test "basic_recursion" =
+  match E.encode_string basic_recur_encoder (Rec (Rec Empty)) with
+  | {|{"Rec":{"Rec":{"Empty":null}}}|} -> true
   | _ -> false

@@ -42,18 +42,12 @@ let rec expr_of_typ (typ : core_type) : expression =
   (*     failwith *)
   (*       (Format.sprintf "This alias was a failure...: %s\n" *)
   (*          (string_of_core_type typ)) *)
-  | { ptyp_desc = Ptyp_constr ({ txt = Lident _lid; _ }, []); _ } as _other_type
-    ->
-      failwith "NYI"
-      (* ( *)
-      (* (\* In the case where our type is truly recursive, we need to instead do `type_aux ()` *\) *)
-      (* let eq (ct1 : core_type) (ct2 : core_type) = *)
-      (*   (\* TODO: This is a terrible way to compare the types... *\) *)
-      (*   string_of_core_type ct1 = string_of_core_type ct2 *)
-      (* in *)
-      (* match CCList.assoc_opt ~eq other_type substitutions with *)
-      (* | Some replacement -> replacement *)
-      (* | None -> Ast_builder.Default.evar ~loc (to_encoder_name lid)) *)
+  | { ptyp_desc = Ptyp_constr ({ txt = Lident lid; _ }, []); _ } ->
+      (* The assumption here is that if we get to this point, this type is recursive, and
+         we just assume that we already have an encoder available.
+         TODO: Is this really the case?
+      *)
+      Ast_builder.Default.evar ~loc (to_encoder_name lid)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)
@@ -176,9 +170,7 @@ and expr_of_variant ~loc (* ~substitutions *) cstrs =
   let cases = List.map to_case cstrs in
   pexp_function ~loc cases
 
-let implementation_generator ~(loc : location) ~rec_flag (* ~substitutions *)
-    type_decl : expression =
-  let rec_flag = really_recursive rec_flag [ type_decl ] in
+let implementation_generator ~(loc : location) type_decl : expression =
   let _name = to_encoder_name type_decl.ptype_name.txt in
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
@@ -215,12 +207,10 @@ let implementation_generator ~(loc : location) ~rec_flag (* ~substitutions *)
     | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
     | _ -> Location.raise_errorf ~loc "Unhandled mystery"
   in
-  match rec_flag with Nonrecursive -> imple_expr | Recursive -> failwith "NYI"
-(* wrap_as_aux ~loc ~name ~expr:imple_expr *)
+  imple_expr
 
-let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
-    structure_item list =
-  let rec_flag = really_recursive rec_flag [ type_decl ] in
+let single_type_decoder_gen ~(loc : location) (* ~rec_flag *) type_decl =
+  (* let rec_flag = really_recursive rec_flag [ type_decl ] in *)
   (* let name = to_encoder_name type_decl.ptype_name.txt in *)
   (* let substitutions = *)
   (*   match rec_flag with *)
@@ -231,21 +221,22 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
   (*           Ast_builder.Default.evar ~loc (name ^ "_aux") ); *)
   (*       ] *)
   (* in *)
-  let imple =
-    implementation_generator ~loc ~rec_flag (* ~substitutions *) type_decl
-  in
+  let imple = implementation_generator ~loc (* ~substitutions *) type_decl in
   let name = to_encoder_name type_decl.ptype_name.txt in
-  [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e imple]]
+  let pat = Ast_builder.Default.pvar ~loc name in
+  Ast_builder.Default.value_binding ~loc ~pat ~expr:imple
 
 let str_gens ~(loc : location) ~(path : label)
     ((rec_flag : rec_flag), type_decls) : structure_item list =
   let _path = path in
   match (really_recursive rec_flag type_decls, type_decls) with
   | Nonrecursive, _ ->
-      List.(flatten (map (single_type_decoder_gen ~loc ~rec_flag) type_decls))
-  | Recursive, [ type_decl ] ->
-      Utils.wrap_27 @@ single_type_decoder_gen ~loc ~rec_flag type_decl
-  | Recursive, _type_decls -> failwith "NYI"
-(* Utils.wrap_27 *)
-(* @@ mutual_rec_fun_gen ~substitutions:[] ~loc type_decls *)
-(* @ fix_mutual_rec_funs ~loc type_decls *)
+      [
+        (Ast_builder.Default.pstr_value ~loc Nonrecursive
+        @@ List.(map (single_type_decoder_gen ~loc) type_decls));
+      ]
+  | Recursive, type_decls ->
+      [
+        (Ast_builder.Default.pstr_value ~loc Recursive
+        @@ List.(map (single_type_decoder_gen ~loc) type_decls));
+      ]
