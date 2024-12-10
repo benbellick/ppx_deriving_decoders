@@ -114,6 +114,8 @@ let rec expr_of_typ (typ : core_type)
       match CCList.assoc_opt ~eq other_type substitutions with
       | Some replacement -> replacement
       | None -> Ast_builder.Default.evar ~loc (to_decoder_name lid))
+  | { ptyp_desc = Ptyp_var var; _ } ->
+      Ast_builder.Default.evar ~loc @@ to_decoder_name var
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)
@@ -302,6 +304,7 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
     structure_item list =
   let rec_flag = really_recursive rec_flag [ type_decl ] in
   let name = to_decoder_name type_decl.ptype_name.txt in
+
   let substitutions =
     match rec_flag with
     | Nonrecursive -> []
@@ -315,6 +318,24 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
     implementation_generator ~loc ~rec_flag ~substitutions type_decl
   in
   let name = to_decoder_name type_decl.ptype_name.txt in
+  let params =
+    (* TODO: can we drop the non type vars? What are these? *)
+    CCList.filter_map
+      (fun (param, _) ->
+        match param.ptyp_desc with Ptyp_var var -> Some var | _ -> None)
+      type_decl.ptype_params
+  in
+  let args =
+    CCList.map
+      (fun param -> Ast_builder.Default.pvar ~loc (to_decoder_name param))
+      params
+  in
+  let imple =
+    (* We need the type variables to become arguments *)
+    CCList.fold_left
+      (fun impl arg -> [%expr fun [%p arg] -> [%e impl]])
+      imple args
+  in
   [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e imple]]
 
 let rec mutual_rec_fun_gen ~loc

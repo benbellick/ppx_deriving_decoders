@@ -49,6 +49,8 @@ type a1 = { l : b1 option; m : c1 option }
 and b1 = { n : c1 }
 and c1 = { o : a1 } [@@deriving decoders]
 
+type 'a with_type_var = { wrapped : 'a } [@@deriving decoders]
+
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
   | Ok i -> i = 1234
