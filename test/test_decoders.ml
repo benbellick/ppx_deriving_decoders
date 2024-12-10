@@ -118,7 +118,7 @@ let%test "deep tuple" =
   | Error _ -> false
 
 let%test "basic constructor" =
-  match D.decode_string my_basic_cstr_decoder {|{"Int": [10]}|} with
+  match D.decode_string my_basic_cstr_decoder {|{"Int": 10}|} with
   | Ok b -> b = Int 10
   | Error _ -> false
 
@@ -141,7 +141,7 @@ let%test "basic record" =
 let%test "complex record" =
   match
     D.decode_string my_complex_record_decoder
-      {|{"basic" : {"i": 10}, "cstr": {"Int": [10]}}|}
+      {|{"basic" : {"i": 10}, "cstr": {"Int": 10}}|}
   with
   | Ok b -> b = { basic = { i = 10 }; cstr = Int 10 }
   | Error _ -> false
@@ -156,7 +156,7 @@ let%test "simple constructor-less variant" =
   | _ -> false
 
 let%test "mixed constructor/less variant" =
-  (match D.decode_string status_decoder {|{"Online": [10]}|} with
+  (match D.decode_string status_decoder {|{"Online": 10}|} with
   | Ok (Online 10) -> true
   | _ -> false)
   &&
@@ -169,9 +169,12 @@ let%test "my list" =
   | Ok Null -> true
   | _ -> false)
   &&
-  match D.decode_string my_list_decoder {|{"L": [{"Null": {}}]}|} with
+  match D.decode_string my_list_decoder {|{"L": {"Null": {}}}|} with
   | Ok (L Null) -> true
-  | _ -> false
+  | Ok _ -> false
+  | Error e ->
+      print_endline @@ D.string_of_error e;
+      false
 
 let%test "variant w/ record constructor" =
   (match D.decode_string constr_w_rec_decoder {|{"Empty": null}|} with
@@ -220,8 +223,8 @@ let%test "expression mutually-recursive decoder" =
     D.decode_string expr_decoder
       {|{"BinOp" : [
        {"Add": {}},
-       {"BinOp" : [{"Div": {}}, {"Num": [10]}, {"Num": [5]}]},
-       {"BinOp" : [{"Mul": {}}, {"Num": [10]}, {"Num": [3]}]}
+       {"BinOp" : [{"Div": {}}, {"Num": 10}, {"Num": 5}]},
+       {"BinOp" : [{"Mul": {}}, {"Num": 10}, {"Num": 3}]}
        ]}|}
   with
   | Ok (BinOp (Add, BinOp (Div, Num 10, Num 5), BinOp (Mul, Num 10, Num 3))) ->

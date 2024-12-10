@@ -177,14 +177,22 @@ and expr_of_tuple ~loc ~substitutions ?lift typs =
 and expr_of_constr_decl ~substitutions
     ({ pcd_args; pcd_loc = loc; _ } as cstr_decl : constructor_declaration) =
   (* We assume at this point that the decomposition into indiviaul fields is handled by caller *)
-  if pcd_args = Pcstr_tuple [] then
-    let cstr = Utils.lident_of_constructor_decl cstr_decl in
-    let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
-    [%expr succeed [%e cstr]]
-  else
-    let cstr = Utils.lident_of_constructor_decl cstr_decl in
-    let sub_expr = expr_of_constr_arg ~substitutions ~loc ~cstr pcd_args in
-    sub_expr
+  match pcd_args with
+  | Pcstr_tuple [] ->
+      let cstr = Utils.lident_of_constructor_decl cstr_decl in
+      let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
+      [%expr succeed [%e cstr]]
+  | Pcstr_tuple [ single ] ->
+      let cstr = Utils.lident_of_constructor_decl cstr_decl in
+      let arg_e = Ast_builder.Default.evar ~loc "arg" in
+      let arg_p = Ast_builder.Default.pvar ~loc "arg" in
+      let cstr = Ast_builder.Default.pexp_construct ~loc cstr (Some arg_e) in
+      let single_dec = expr_of_typ single ~substitutions in
+      [%expr [%e single_dec] >|= fun [%p arg_p] -> [%e cstr]]
+  | _ ->
+      let cstr = Utils.lident_of_constructor_decl cstr_decl in
+      let sub_expr = expr_of_constr_arg ~substitutions ~loc ~cstr pcd_args in
+      sub_expr
 
 and expr_of_constr_arg ~loc ~cstr ~substitutions (arg : constructor_arguments) =
   match arg with
