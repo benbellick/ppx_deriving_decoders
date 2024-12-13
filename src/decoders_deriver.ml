@@ -15,23 +15,6 @@ let apply_substitution ~orig ~substi =
   in
   mapper#expression
 
-(* let suppress_warning_27 = *)
-(*   let suppress_warning_27 = *)
-(*     let loc = Location.none in *)
-(*     let payload = *)
-(*       PStr *)
-(*         [ *)
-(*           Ast_helper.Str.eval *)
-(*             (Ast_helper.Exp.constant (Pconst_string ("-27", loc, None))); *)
-(*         ] *)
-(*     in *)
-(*     let attr_name = "ocaml.warning"  *)
-
-(*   in *)
-(*   let attribute = Ast_builder.Default.attribute ~loc ~name:attr_name ~payload in *)
-(*   Ast_builder.Default.pstr_attribute ~loc attribute *)
-
-(* let enforce_warning_27 = _ *)
 let to_decoder_name i = i ^ "_decoder"
 
 let decoder_pvar_of_type_decl type_decl =
@@ -116,6 +99,13 @@ let rec expr_of_typ (typ : core_type)
       | None -> Ast_builder.Default.evar ~loc (to_decoder_name lid))
   | { ptyp_desc = Ptyp_var var; _ } ->
       Ast_builder.Default.evar ~loc @@ to_decoder_name var
+  | { ptyp_desc = Ptyp_constr ({ txt = Lident name; _ }, args); _ } ->
+      let cstr_dec = Ast_builder.Default.evar ~loc @@ to_decoder_name name in
+
+      let arg_decs = CCList.map (expr_of_typ ~substitutions) args in
+      Ast_builder.Default.eapply ~loc cstr_dec arg_decs
+      (* Location.raise_errorf ~loc "Cannot constructor decoder for %s" *)
+      (*   (string_of_core_type typ) *)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)

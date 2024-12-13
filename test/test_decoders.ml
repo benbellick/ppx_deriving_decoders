@@ -49,7 +49,8 @@ type a1 = { l : b1 option; m : c1 option }
 and b1 = { n : c1 }
 and c1 = { o : a1 } [@@deriving decoders]
 
-type 'a with_type_var = { wrapped : 'a } [@@deriving decoders]
+type 'a record_wrapper = { wrapped : 'a } [@@deriving decoders]
+type int_record_wrapper = int record_wrapper [@@deriving decoders]
 
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
@@ -235,3 +236,8 @@ let%test "expression mutually-recursive decoder" =
   | Error e ->
       print_endline @@ D.string_of_error e;
       false
+
+let%test "simple type var" =
+  match D.decode_string int_record_wrapper_decoder {|{"wrapped":-2389}|} with
+  | Ok { wrapped = -2389 } -> true
+  | _ -> false
