@@ -273,5 +273,5 @@ let%test "double type var" =
   match
     D.decode_string double_wrapped_decoder {|{"fst":99,"snd":"another"}|}
   with
-  | Ok { fst = 990; snd = "another" } -> true
+  | Ok { fst = 99; snd = "another" } -> true
   | _ -> false
