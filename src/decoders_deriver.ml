@@ -20,7 +20,9 @@ let to_decoder_name i = i ^ "_decoder"
 let rec flatten_longident = function
   | Lident txt -> txt
   | Ldot (longident, txt) -> flatten_longident longident ^ "." ^ txt
-  | Lapply _ -> failwith "oops"
+  | Lapply _ ->
+      (* TODO: when would this happen?  *)
+      failwith "oops"
 
 let longident_to_decoder_name = CCFun.(to_decoder_name % flatten_longident)
 let name_to_decoder_name (i : string loc) = to_decoder_name i.txt
@@ -431,7 +433,7 @@ let str_gens ~(loc : location) ~(path : label)
   let _path = path in
   match (really_recursive rec_flag type_decls, type_decls) with
   | Nonrecursive, _ ->
-      List.(flatten (map (single_type_decoder_gen ~loc ~rec_flag) type_decls))
+      CCList.flat_map (single_type_decoder_gen ~loc ~rec_flag) type_decls
   | Recursive, [ type_decl ] ->
       Utils.wrap_27 @@ single_type_decoder_gen ~loc ~rec_flag type_decl
   | Recursive, _type_decls ->

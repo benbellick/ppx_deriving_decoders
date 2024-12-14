@@ -69,3 +69,32 @@ let%test "basic_recursion" =
   match E.encode_string basic_recur_encoder (Rec (Rec Empty)) with
   | {|{"Rec":{"Rec":{"Empty":null}}}|} -> true
   | _ -> false
+
+type 'a record_wrapper = { wrapped : 'a } [@@deriving encoders]
+type int_record_wrapper = int record_wrapper [@@deriving encoders]
+
+let%test "basic type var" =
+  match E.encode_string int_record_wrapper_encoder { wrapped = 9876 } with
+  | {|{"wrapped":9876}|} -> true
+  | _ -> false
+
+type ('a, 'b) double_wrap = { fst : 'a; snd : 'b } [@@deriving encoders]
+type double_wrapped = (string, int) double_wrap [@@deriving encoders]
+
+let%test "double type var" =
+  match E.encode_string double_wrapped_encoder { fst = 9; snd = "10" } with
+  | {|{"fst":9,"snd":"10"}|} -> true
+  | _ -> false
+
+module Outer = struct
+  module Inner = struct
+    type t = string [@@deriving encoders]
+  end
+end
+
+type outer_inner_wrapped = Outer.Inner.t record_wrapper [@@deriving encoders]
+
+let%test "module wrapped" =
+  match E.encode_string outer_inner_wrapped_encoder { wrapped = "a thing" } with
+  | {|{"wrapped":"a thing"}|} -> true
+  | _ -> false

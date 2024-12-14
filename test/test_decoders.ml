@@ -265,3 +265,13 @@ let%test "basic module-wrapped type" =
   match D.decode_string outer_inner_wrapped_decoder {|{"wrapped":"value"}|} with
   | Ok { wrapped = "value" } -> true
   | _ -> false
+
+type ('a, 'b) double_wrap = { fst : 'a; snd : 'b } [@@deriving decoders]
+type double_wrapped = (string, int) double_wrap [@@deriving decoders]
+
+let%test "double type var" =
+  match
+    D.decode_string double_wrapped_decoder {|{"fst":99,"snd":"another"}|}
+  with
+  | Ok { fst = 99; snd = "another" } -> true
+  | _ -> false
