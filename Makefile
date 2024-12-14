@@ -6,3 +6,6 @@ opam-install-dev-deps:
 
 show-ppx-test-encoders:
 	dune exec -- pp/pp.exe	test/test_encoders.ml
+
+show-ppx-test-decoders:
+	dune exec -- pp/pp.exe	test/test_decoders.ml
