@@ -17,13 +17,21 @@ let apply_substitution ~orig ~substi =
 
 let to_decoder_name i = i ^ "_decoder"
 
+let rec flatten_longident = function
+  | Lident txt -> txt
+  | Ldot (longident, txt) -> flatten_longident longident ^ "." ^ txt
+  | Lapply _ -> failwith "oops"
+
+let longident_to_decoder_name = CCFun.(to_decoder_name % flatten_longident)
+let name_to_decoder_name (i : string loc) = to_decoder_name i.txt
+
 let decoder_pvar_of_type_decl type_decl =
   Ast_builder.Default.pvar ~loc:type_decl.ptype_name.loc
-    (to_decoder_name type_decl.ptype_name.txt)
+    (name_to_decoder_name type_decl.ptype_name)
 
 let decoder_evar_of_type_decl type_decl =
   Ast_builder.Default.evar ~loc:type_decl.ptype_name.loc
-    (to_decoder_name type_decl.ptype_name.txt)
+    (name_to_decoder_name type_decl.ptype_name)
 
 (** We take an expr implementation with name NAME and turn it into:
     let rec NAME_AUX = fun () -> expr in NAME_AUX ().
@@ -87,7 +95,7 @@ let rec expr_of_typ (typ : core_type)
   (*     failwith *)
   (*       (Format.sprintf "This alias was a failure...: %s\n" *)
   (*          (string_of_core_type typ)) *)
-  | { ptyp_desc = Ptyp_constr ({ txt = Lident lid; _ }, []); _ } as other_type
+  | { ptyp_desc = Ptyp_constr ({ txt = longident; _ }, []); _ } as other_type
     -> (
       (* In the case where our type is truly recursive, we need to instead do `type_aux ()` *)
       let eq (ct1 : core_type) (ct2 : core_type) =
@@ -96,11 +104,14 @@ let rec expr_of_typ (typ : core_type)
       in
       match CCList.assoc_opt ~eq other_type substitutions with
       | Some replacement -> replacement
-      | None -> Ast_builder.Default.evar ~loc (to_decoder_name lid))
+      | None ->
+          Ast_builder.Default.evar ~loc (longident_to_decoder_name longident))
   | { ptyp_desc = Ptyp_var var; _ } ->
       Ast_builder.Default.evar ~loc @@ to_decoder_name var
-  | { ptyp_desc = Ptyp_constr ({ txt = Lident name; _ }, args); _ } ->
-      let cstr_dec = Ast_builder.Default.evar ~loc @@ to_decoder_name name in
+  | { ptyp_desc = Ptyp_constr ({ txt = longident; _ }, args); _ } ->
+      let cstr_dec =
+        Ast_builder.Default.evar ~loc @@ longident_to_decoder_name longident
+      in
 
       let arg_decs = CCList.map (expr_of_typ ~substitutions) args in
       Ast_builder.Default.eapply ~loc cstr_dec arg_decs
@@ -276,7 +287,7 @@ let expr_of_variant ~loc ~substitutions cstrs =
 let implementation_generator ~(loc : location) ~rec_flag ~substitutions
     type_decl : expression =
   let rec_flag = really_recursive rec_flag [ type_decl ] in
-  let name = to_decoder_name type_decl.ptype_name.txt in
+  let name = name_to_decoder_name type_decl.ptype_name in
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ ~substitutions manifest
@@ -293,7 +304,7 @@ let implementation_generator ~(loc : location) ~rec_flag ~substitutions
 let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
     structure_item list =
   let rec_flag = really_recursive rec_flag [ type_decl ] in
-  let name = to_decoder_name type_decl.ptype_name.txt in
+  let name = name_to_decoder_name type_decl.ptype_name in
 
   let substitutions =
     match rec_flag with
@@ -307,7 +318,7 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
   let imple =
     implementation_generator ~loc ~rec_flag ~substitutions type_decl
   in
-  let name = to_decoder_name type_decl.ptype_name.txt in
+  let name = name_to_decoder_name type_decl.ptype_name in
   let params =
     (* TODO: can we drop the non type vars? What are these? *)
     CCList.filter_map
@@ -337,12 +348,12 @@ let rec mutual_rec_fun_gen ~loc
   | type_decl :: rest ->
       let var =
         pvar ~loc:type_decl.ptype_name.loc
-          (to_decoder_name type_decl.ptype_name.txt)
+          (name_to_decoder_name type_decl.ptype_name)
       in
       let substitutions =
         match really_recursive Recursive [ type_decl ] with
         | Recursive ->
-            let name = to_decoder_name type_decl.ptype_name.txt in
+            let name = name_to_decoder_name type_decl.ptype_name in
             let substi = Ast_builder.Default.evar ~loc (name ^ "_aux") in
             let new_substitution =
               (core_type_of_type_declaration type_decl, substi)
@@ -367,7 +378,7 @@ let rec mutual_rec_fun_gen ~loc
         else
           List.map
             (fun type_decl ->
-              let name = to_decoder_name type_decl.ptype_name.txt in
+              let name = name_to_decoder_name type_decl.ptype_name in
               pvar ~loc:type_decl.ptype_name.loc name)
             rest
       in
@@ -375,10 +386,10 @@ let rec mutual_rec_fun_gen ~loc
       let dec = [%stri let [%p var] = [%e imple_as_lambda]] in
       let substi =
         pexp_apply ~loc
-          (evar ~loc (to_decoder_name type_decl.ptype_name.txt))
+          (evar ~loc (name_to_decoder_name type_decl.ptype_name))
           (List.map
              (fun decl ->
-               (Nolabel, evar ~loc (to_decoder_name decl.ptype_name.txt)))
+               (Nolabel, evar ~loc (name_to_decoder_name decl.ptype_name)))
              rest)
       in
       let new_substitution =

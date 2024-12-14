@@ -241,3 +241,27 @@ let%test "simple type var" =
   match D.decode_string int_record_wrapper_decoder {|{"wrapped":-2389}|} with
   | Ok { wrapped = -2389 } -> true
   | _ -> false
+
+module Blah = struct
+  type t = int [@@deriving decoders]
+end
+
+type blah_wrapped = Blah.t record_wrapper [@@deriving decoders]
+
+let%test "basic module-wrapped type" =
+  match D.decode_string blah_wrapped_decoder {|{"wrapped":10110}|} with
+  | Ok { wrapped = 10110 } -> true
+  | _ -> false
+
+module Outer = struct
+  module Inner = struct
+    type t = string [@@deriving decoders]
+  end
+end
+
+type outer_inner_wrapped = Outer.Inner.t record_wrapper [@@deriving decoders]
+
+let%test "basic module-wrapped type" =
+  match D.decode_string outer_inner_wrapped_decoder {|{"wrapped":"value"}|} with
+  | Ok { wrapped = "value" } -> true
+  | _ -> false
