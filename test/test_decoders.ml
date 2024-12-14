@@ -270,8 +270,6 @@ type ('a, 'b) double_wrap = { fst : 'a; snd : 'b } [@@deriving decoders]
 type double_wrapped = (string, int) double_wrap [@@deriving decoders]
 
 let%test "double type var" =
-  match
-    D.decode_string double_wrapped_decoder {|{"fst":99,"snd":"another"}|}
-  with
-  | Ok { fst = 99; snd = "another" } -> true
+  match D.decode_string double_wrapped_decoder {|{"fst":"99","snd":100}|} with
+  | Ok { fst = "99"; snd = 100 } -> true
   | _ -> false

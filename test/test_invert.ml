@@ -65,3 +65,27 @@ let%test "a1:2" =
           { n = { o = { l = None; m = Some { o = { l = None; m = None } } } } };
       m = None;
     }
+
+(* Random usage of modules intermixed with type vars *)
+
+module Outer = struct
+  type ('a, 'b, 'c) v = Fst of 'a list | Snd of 'b option | Trd of 'c
+  [@@deriving decoders, encoders]
+
+  [@@@deriving.end]
+
+  module Inner = struct
+    type t = int [@@deriving decoders, encoders]
+  end
+end
+
+type nesting = (string, Outer.Inner.t, bool) Outer.v
+[@@deriving decoders, encoders]
+
+let nesting_id = make_id nesting_encoder nesting_decoder
+
+let%test "nesting:1" =
+  check nesting_id (Fst [ "there"; "is"; "some"; "string" ])
+
+let%test "nesting:2" = check nesting_id (Snd (Some 10))
+let%test "nesting:3" = check nesting_id (Trd false)

@@ -82,8 +82,8 @@ type ('a, 'b) double_wrap = { fst : 'a; snd : 'b } [@@deriving encoders]
 type double_wrapped = (string, int) double_wrap [@@deriving encoders]
 
 let%test "double type var" =
-  match E.encode_string double_wrapped_encoder { fst = 9; snd = "10" } with
-  | {|{"fst":9,"snd":"10"}|} -> true
+  match E.encode_string double_wrapped_encoder { fst = "9"; snd = 10 } with
+  | {|{"fst":"9","snd":10}|} -> true
   | _ -> false
 
 module Outer = struct

@@ -215,9 +215,10 @@ let single_type_encoder_gen ~(loc : location) type_decl =
       type_decl.ptype_params
   in
   let args =
-    CCList.map
-      (fun param -> Ast_builder.Default.pvar ~loc (to_encoder_name param))
-      params
+    CCList.rev
+    @@ CCList.map
+         (fun param -> Ast_builder.Default.pvar ~loc (to_encoder_name param))
+         params
   in
   let imple =
     (* We need the type variables to become arguments *)
