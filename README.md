@@ -2,7 +2,7 @@
 
 [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders) is an excellent library for writing decoders using decoding combinators. However, writing out decoders by hand for more complicated types can be quite time-intensive. 
   
-This library helps by automatically producing the appropriate decoder for a particular type. 
+This library helps by automatically producing the appropriate decoder (and encoder!) for a particular type. 
 
 There are two primary ways in which this library can be of use. (More details of both follows.)
 
@@ -78,27 +78,21 @@ type bar = Int of int | String of string [@@deriving_inline decoders]
 [@@@deriving.end]
 ```
 
-Then, after running `dune build --auto-promote`, our file will become:
+Then, after running `dune build --auto-promote`, our file will become (after applying `ocamlformat`):
 ```ocaml
 (* In file foo.ml *)
 module D = Decoders_yojson.Safe.Decode
 
 type bar = Int of int | String of string [@@deriving_inline decoders]
-
 let _ = fun (_ : bar) -> ()
+
 let bar_decoder =
   let open D in
-    single_field
-      (function
-       | "Int" ->
-           let open D in
-             let (>>=::) fst rest = uncons rest fst in
-             D.int >>=:: ((fun arg0 -> succeed (Int arg0)))
-       | "String" ->
-           let open D in
-             let (>>=::) fst rest = uncons rest fst in
-             D.string >>=:: ((fun arg0 -> succeed (String arg0)))
-       | any -> D.fail @@ (Printf.sprintf "Unrecognized field: %s" any))
+  single_field (function
+    | "Int" -> D.int >|= fun arg -> Int arg
+    | "String" -> D.string >|= fun arg -> String arg
+    | any -> D.fail @@ Printf.sprintf "Unrecognized field: %s" any)
+
 let _ = bar_decoder
 [@@@deriving.end]
 ```
@@ -116,68 +110,114 @@ and op = Add | Sub | Mul | Div [@@deriving_inline decoders]
 
 [@@@deriving.end]
 ```
-after invoking `dune build --auto-promote` will yield:
+after invoking `dune build --auto-promote` (plus `ocamlformat`) will yield:
 ```ocaml 
 (* In file foo.ml *)
  type expr = Num of int | BinOp of op * expr * expr
  and op = Add | Sub | Mul | Div [@@deriving_inline decoders]
- 
+
 let _ = fun (_ : expr) -> ()
 let _ = fun (_ : op) -> ()
+
 [@@@ocaml.warning "-27"]
+
 let expr_decoder op_decoder =
-  D.fix
-    (fun expr_decoder_aux ->
-       let open D in
-         single_field
-           (function
-            | "Num" ->
-                let open D in
-                  let (>>=::) fst rest = uncons rest fst in
-                  D.int >>=:: ((fun arg0 -> succeed (Num arg0)))
-            | "BinOp" ->
-                let open D in
-                  let (>>=::) fst rest = uncons rest fst in
-                  op_decoder >>=::
-                    ((fun arg0 ->
-                        expr_decoder_aux >>=::
-                          (fun arg1 ->
-                             expr_decoder_aux >>=::
-                               (fun arg2 ->
-                                  succeed (BinOp (arg0, arg1, arg2))))))
-            | any -> D.fail @@ (Printf.sprintf "Unrecognized field: %s" any)))
+  D.fix (fun expr_decoder_aux ->
+      let open D in
+      single_field (function
+        | "Num" -> D.int >|= fun arg -> Num arg
+        | "BinOp" ->
+            let open D in
+            let ( >>=:: ) fst rest = uncons rest fst in
+            op_decoder >>=:: fun arg0 ->
+            expr_decoder_aux >>=:: fun arg1 ->
+            expr_decoder_aux >>=:: fun arg2 ->
+            succeed (BinOp (arg0, arg1, arg2))
+        | any -> D.fail @@ Printf.sprintf "Unrecognized field: %s" any))
+
 let _ = expr_decoder
+
 let op_decoder op_decoder =
   let open D in
-    single_field
-      (function
-       | "Add" -> succeed Add
-       | "Sub" -> succeed Sub
-       | "Mul" -> succeed Mul
-       | "Div" -> succeed Div
-       | any -> D.fail @@ (Printf.sprintf "Unrecognized field: %s" any))
+  single_field (function
+    | "Add" -> succeed Add
+    | "Sub" -> succeed Sub
+    | "Mul" -> succeed Mul
+    | "Div" -> succeed Div
+    | any -> D.fail @@ Printf.sprintf "Unrecognized field: %s" any)
+
 let _ = op_decoder
 let op_decoder = D.fix op_decoder
 let _ = op_decoder
 let expr_decoder = expr_decoder op_decoder
 let _ = expr_decoder
+
 [@@@ocaml.warning "+27"]
+
 [@@@deriving.end]
 ```
 Notice that the mutual recursion is handled for you!
 
+## Type vars
+The `ppx` can also handle types with type variables: 
+```ocaml
+type 'a wrapper = { wrapped : 'a } [@@deriving_inline decoders]
+[@@@deriving.end]
+```
+becomes (additionally with `ocamlformat`): 
+
+```ocaml
+type 'a record_wrapper = { wrapped : 'a } [@@deriving_inline decoders]
+
+let _ = fun (_ : 'a record_wrapper) -> ()
+
+let record_wrapper_decoder a_decoder =
+  let open D in
+  let open D.Infix in
+  let* wrapped = field "wrapped" a_decoder in
+  succeed { wrapped }
+
+let _ = record_wrapper_decoder
+
+[@@@deriving.end]
+```
+Notice that the decoder for the type variable becomes a parameter of the generated decoder!
+
+## Encoders
+All of the above information also applies to generating encoders. Using the above type as an example: 
+```ocaml
+type 'a wrapper = { wrapped : 'a } [@@deriving_inline decoders]
+[@@@deriving.end]
+```
+becomes (additionally with `ocamlformat`): 
+
+```ocaml
+type 'a wrapper = { wrapped : 'a } [@@deriving_inline encoders]
+
+let _ = fun (_ : 'a record_wrapper) -> ()
+
+let wrapper_encoder a_encoder { wrapped } =
+  E.obj [ ("wrapped", a_encoder wrapped) ]
+
+let _ = record_wrapper_encoder
+
+[@@@deriving.end]
+```
+
+Of course, you can generate both by using `[@@deriving_inline decoders, encoders]` or `[@@deriving decoders, encoders]`. The corresponding pair will be inverses of one another provided that all prior referenced decoder/encoder pairs are inverses!
+
+
 ## Limitations
 - Some of the decoders can be quite complicated relative to what you would write by hand
-- There is not great support for types which feature type variables
 - There are a lot of rough edges in places like: 
   - Error reporting
   - Correctly handling `loc`
+- In an ideal world, it would be nice to generate the corresponding decoders/encoders within their own submodule. It remains to be seen how this can be done. 
 
 ## Future Work
-- [ ] Automatically generate corresponding encoders which are inverses of the decoders
-- [ ] Better handling of type variables 
 - [ ] Simplify generated decoders
 - [ ] Generate decoders from a module
+- [ ] How to handle types produced from functors inline
 
 ## Contributing
 

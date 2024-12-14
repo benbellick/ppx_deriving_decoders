@@ -2,14 +2,17 @@ open Ppxlib
 
 let to_encoder_name i = i ^ "_encoder"
 
-let rec flatten_longident = function
+let rec flatten_longident ~loc = function
   | Lident txt -> txt
-  | Ldot (longident, txt) -> flatten_longident longident ^ "." ^ txt
-  | Lapply _ ->
-      (* TODO: when would this happen?  *)
-      failwith "oops"
+  | Ldot (longident, txt) -> flatten_longident longident ~loc ^ "." ^ txt
+  | Lapply (fst, snd) ->
+      Location.raise_errorf ~loc "Cannot handle functors:%s (%s)"
+        (flatten_longident ~loc fst)
+        (flatten_longident ~loc snd)
 
-let longident_to_encoder_name = CCFun.(to_encoder_name % flatten_longident)
+let longident_to_encoder_name ~loc =
+  CCFun.(to_encoder_name % flatten_longident ~loc)
+
 let name_to_encoder_name (i : string loc) = to_encoder_name i.txt
 
 let rec expr_of_typ (typ : core_type) : expression =
@@ -53,9 +56,10 @@ let rec expr_of_typ (typ : core_type) : expression =
          TODO: Is this really the case?
       *)
       Ast_builder.Default.evar ~loc (to_encoder_name lid)
-  | { ptyp_desc = Ptyp_constr ({ txt = longident; _ }, args); _ } ->
+  | { ptyp_desc = Ptyp_constr ({ txt = longident; loc }, args); _ } ->
       let cstr_dec =
-        Ast_builder.Default.evar ~loc @@ longident_to_encoder_name longident
+        Ast_builder.Default.evar ~loc
+        @@ longident_to_encoder_name ~loc longident
       in
 
       let arg_decs = CCList.map expr_of_typ args in

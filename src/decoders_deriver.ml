@@ -17,14 +17,17 @@ let apply_substitution ~orig ~substi =
 
 let to_decoder_name i = i ^ "_decoder"
 
-let rec flatten_longident = function
+let rec flatten_longident ~loc = function
   | Lident txt -> txt
-  | Ldot (longident, txt) -> flatten_longident longident ^ "." ^ txt
-  | Lapply _ ->
-      (* TODO: when would this happen?  *)
-      failwith "oops"
+  | Ldot (longident, txt) -> flatten_longident ~loc longident ^ "." ^ txt
+  | Lapply (fst, snd) ->
+      Location.raise_errorf ~loc "Cannot handle functors:%s (%s)"
+        (flatten_longident ~loc fst)
+        (flatten_longident ~loc snd)
 
-let longident_to_decoder_name = CCFun.(to_decoder_name % flatten_longident)
+let longident_to_decoder_name ~loc =
+  CCFun.(to_decoder_name % flatten_longident ~loc)
+
 let name_to_decoder_name (i : string loc) = to_decoder_name i.txt
 
 let decoder_pvar_of_type_decl type_decl =
@@ -97,8 +100,8 @@ let rec expr_of_typ (typ : core_type)
   (*     failwith *)
   (*       (Format.sprintf "This alias was a failure...: %s\n" *)
   (*          (string_of_core_type typ)) *)
-  | { ptyp_desc = Ptyp_constr ({ txt = longident; _ }, []); _ } as other_type
-    -> (
+  | { ptyp_desc = Ptyp_constr ({ txt = longident; loc = typ_loc }, []); _ } as
+    other_type -> (
       (* In the case where our type is truly recursive, we need to instead do `type_aux ()` *)
       let eq (ct1 : core_type) (ct2 : core_type) =
         (* TODO: This is a terrible way to compare the types... *)
@@ -107,12 +110,14 @@ let rec expr_of_typ (typ : core_type)
       match CCList.assoc_opt ~eq other_type substitutions with
       | Some replacement -> replacement
       | None ->
-          Ast_builder.Default.evar ~loc (longident_to_decoder_name longident))
+          Ast_builder.Default.evar ~loc
+            (longident_to_decoder_name ~loc:typ_loc longident))
   | { ptyp_desc = Ptyp_var var; _ } ->
       Ast_builder.Default.evar ~loc @@ to_decoder_name var
-  | { ptyp_desc = Ptyp_constr ({ txt = longident; _ }, args); _ } ->
+  | { ptyp_desc = Ptyp_constr ({ txt = longident; loc }, args); _ } ->
       let cstr_dec =
-        Ast_builder.Default.evar ~loc @@ longident_to_decoder_name longident
+        Ast_builder.Default.evar ~loc
+        @@ longident_to_decoder_name ~loc longident
       in
 
       let arg_decs = CCList.map (expr_of_typ ~substitutions) args in
