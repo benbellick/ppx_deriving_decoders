@@ -15,46 +15,28 @@ let apply_substitution ~orig ~substi =
   in
   mapper#expression
 
-let generate_attribute v ~loc =
-  let open Ast_builder.Default in
-  pstr_attribute ~loc
-    (attribute ~loc
-       ~name:(Located.mk ~loc "ocaml.warning")
-       ~payload:(PStr [ pstr_eval ~loc (estring ~loc v) [] ]))
-
-let suppress_warning_27 ~loc = generate_attribute ~loc "-27"
-let enforce_warning_27 ~loc = generate_attribute ~loc "+27"
-
-let wrap_27 xs =
-  (suppress_warning_27 ~loc:Location.none :: xs)
-  @ [ enforce_warning_27 ~loc:Location.none ]
-
-(* let suppress_warning_27 = *)
-(*   let suppress_warning_27 = *)
-(*     let loc = Location.none in *)
-(*     let payload = *)
-(*       PStr *)
-(*         [ *)
-(*           Ast_helper.Str.eval *)
-(*             (Ast_helper.Exp.constant (Pconst_string ("-27", loc, None))); *)
-(*         ] *)
-(*     in *)
-(*     let attr_name = "ocaml.warning"  *)
-
-(*   in *)
-(*   let attribute = Ast_builder.Default.attribute ~loc ~name:attr_name ~payload in *)
-(*   Ast_builder.Default.pstr_attribute ~loc attribute *)
-
-(* let enforce_warning_27 = _ *)
 let to_decoder_name i = i ^ "_decoder"
+
+let rec flatten_longident ~loc = function
+  | Lident txt -> txt
+  | Ldot (longident, txt) -> flatten_longident ~loc longident ^ "." ^ txt
+  | Lapply (fst, snd) ->
+      Location.raise_errorf ~loc "Cannot handle functors:%s (%s)"
+        (flatten_longident ~loc fst)
+        (flatten_longident ~loc snd)
+
+let longident_to_decoder_name ~loc =
+  CCFun.(to_decoder_name % flatten_longident ~loc)
+
+let name_to_decoder_name (i : string loc) = to_decoder_name i.txt
 
 let decoder_pvar_of_type_decl type_decl =
   Ast_builder.Default.pvar ~loc:type_decl.ptype_name.loc
-    (to_decoder_name type_decl.ptype_name.txt)
+    (name_to_decoder_name type_decl.ptype_name)
 
 let decoder_evar_of_type_decl type_decl =
   Ast_builder.Default.evar ~loc:type_decl.ptype_name.loc
-    (to_decoder_name type_decl.ptype_name.txt)
+    (name_to_decoder_name type_decl.ptype_name)
 
 (** We take an expr implementation with name NAME and turn it into:
     let rec NAME_AUX = fun () -> expr in NAME_AUX ().
@@ -78,11 +60,6 @@ let pexp_fun_multiarg ~loc fun_imple (args : pattern list) =
   (* TODO: remove inefficient list reversal  *)
   let args_rev = List.rev args in
   CCList.fold_left folder fun_imple args_rev
-
-let lident_of_constructor_decl (cd : constructor_declaration) =
-  let loc = cd.pcd_name.loc in
-  let name = cd.pcd_name.txt in
-  Ast_builder.Default.Located.lident ~loc name
 
 let rec expr_of_typ (typ : core_type)
     ~(substitutions : (core_type * expression) list) : expression =
@@ -123,8 +100,8 @@ let rec expr_of_typ (typ : core_type)
   (*     failwith *)
   (*       (Format.sprintf "This alias was a failure...: %s\n" *)
   (*          (string_of_core_type typ)) *)
-  | { ptyp_desc = Ptyp_constr ({ txt = Lident lid; _ }, []); _ } as other_type
-    -> (
+  | { ptyp_desc = Ptyp_constr ({ txt = longident; loc = typ_loc }, []); _ } as
+    other_type -> (
       (* In the case where our type is truly recursive, we need to instead do `type_aux ()` *)
       let eq (ct1 : core_type) (ct2 : core_type) =
         (* TODO: This is a terrible way to compare the types... *)
@@ -132,7 +109,21 @@ let rec expr_of_typ (typ : core_type)
       in
       match CCList.assoc_opt ~eq other_type substitutions with
       | Some replacement -> replacement
-      | None -> Ast_builder.Default.evar ~loc (to_decoder_name lid))
+      | None ->
+          Ast_builder.Default.evar ~loc
+            (longident_to_decoder_name ~loc:typ_loc longident))
+  | { ptyp_desc = Ptyp_var var; _ } ->
+      Ast_builder.Default.evar ~loc @@ to_decoder_name var
+  | { ptyp_desc = Ptyp_constr ({ txt = longident; loc }, args); _ } ->
+      let cstr_dec =
+        Ast_builder.Default.evar ~loc
+        @@ longident_to_decoder_name ~loc longident
+      in
+
+      let arg_decs = CCList.map (expr_of_typ ~substitutions) args in
+      Ast_builder.Default.eapply ~loc cstr_dec arg_decs
+      (* Location.raise_errorf ~loc "Cannot constructor decoder for %s" *)
+      (*   (string_of_core_type typ) *)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)
@@ -155,7 +146,6 @@ and expr_of_tuple ~loc ~substitutions ?lift typs =
      string >>=:: fun arg2 ->
      bool >>=:: fun arg3 -> succeed (lift (arg1, arg2, arg3))
   *)
-  let argn = Printf.sprintf "arg%d" in
   let typ_decoder_exprs = List.map (expr_of_typ ~substitutions) typs in
   let base =
     (* Consists of the initial setup partial function def, which is the inport and local definition,
@@ -168,7 +158,7 @@ and expr_of_tuple ~loc ~substitutions ?lift typs =
       0 )
   in
   let fn_builder (partial_expr, i) next_decoder =
-    let var = argn i in
+    let var = Utils.argn i in
     let var_pat = Ast_builder.Default.pvar ~loc var in
     ( (fun body ->
         partial_expr
@@ -178,7 +168,7 @@ and expr_of_tuple ~loc ~substitutions ?lift typs =
   let complete_partial_expr, var_count =
     List.fold_left fn_builder base typ_decoder_exprs
   in
-  let var_names = CCList.init var_count argn in
+  let var_names = CCList.init var_count Utils.argn in
   let var_tuple =
     let expr_list =
       List.map (fun s -> [%expr [%e Ast_builder.Default.evar ~loc s]]) var_names
@@ -197,14 +187,22 @@ and expr_of_tuple ~loc ~substitutions ?lift typs =
 and expr_of_constr_decl ~substitutions
     ({ pcd_args; pcd_loc = loc; _ } as cstr_decl : constructor_declaration) =
   (* We assume at this point that the decomposition into indiviaul fields is handled by caller *)
-  if pcd_args = Pcstr_tuple [] then
-    let cstr = lident_of_constructor_decl cstr_decl in
-    let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
-    [%expr succeed [%e cstr]]
-  else
-    let cstr = lident_of_constructor_decl cstr_decl in
-    let sub_expr = expr_of_constr_arg ~substitutions ~loc ~cstr pcd_args in
-    sub_expr
+  match pcd_args with
+  | Pcstr_tuple [] ->
+      let cstr = Utils.lident_of_constructor_decl cstr_decl in
+      let cstr = Ast_builder.Default.pexp_construct ~loc cstr None in
+      [%expr succeed [%e cstr]]
+  | Pcstr_tuple [ single ] ->
+      let cstr = Utils.lident_of_constructor_decl cstr_decl in
+      let arg_e = Ast_builder.Default.evar ~loc "arg" in
+      let arg_p = Ast_builder.Default.pvar ~loc "arg" in
+      let cstr = Ast_builder.Default.pexp_construct ~loc cstr (Some arg_e) in
+      let single_dec = expr_of_typ single ~substitutions in
+      [%expr [%e single_dec] >|= fun [%p arg_p] -> [%e cstr]]
+  | _ ->
+      let cstr = Utils.lident_of_constructor_decl cstr_decl in
+      let sub_expr = expr_of_constr_arg ~substitutions ~loc ~cstr pcd_args in
+      sub_expr
 
 and expr_of_constr_arg ~loc ~cstr ~substitutions (arg : constructor_arguments) =
   match arg with
@@ -296,7 +294,7 @@ let expr_of_variant ~loc ~substitutions cstrs =
 let implementation_generator ~(loc : location) ~rec_flag ~substitutions
     type_decl : expression =
   let rec_flag = really_recursive rec_flag [ type_decl ] in
-  let name = to_decoder_name type_decl.ptype_name.txt in
+  let name = name_to_decoder_name type_decl.ptype_name in
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ ~substitutions manifest
@@ -313,7 +311,8 @@ let implementation_generator ~(loc : location) ~rec_flag ~substitutions
 let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
     structure_item list =
   let rec_flag = really_recursive rec_flag [ type_decl ] in
-  let name = to_decoder_name type_decl.ptype_name.txt in
+  let name = name_to_decoder_name type_decl.ptype_name in
+
   let substitutions =
     match rec_flag with
     | Nonrecursive -> []
@@ -326,7 +325,26 @@ let single_type_decoder_gen ~(loc : location) ~rec_flag type_decl :
   let imple =
     implementation_generator ~loc ~rec_flag ~substitutions type_decl
   in
-  let name = to_decoder_name type_decl.ptype_name.txt in
+  let name = name_to_decoder_name type_decl.ptype_name in
+  let params =
+    (* TODO: can we drop the non type vars? What are these? *)
+    CCList.filter_map
+      (fun (param, _) ->
+        match param.ptyp_desc with Ptyp_var var -> Some var | _ -> None)
+      type_decl.ptype_params
+  in
+  let args =
+    CCList.rev
+    @@ CCList.map
+         (fun param -> Ast_builder.Default.pvar ~loc (to_decoder_name param))
+         params
+  in
+  let imple =
+    (* We need the type variables to become arguments *)
+    CCList.fold_left
+      (fun impl arg -> [%expr fun [%p arg] -> [%e impl]])
+      imple args
+  in
   [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e imple]]
 
 let rec mutual_rec_fun_gen ~loc
@@ -338,12 +356,12 @@ let rec mutual_rec_fun_gen ~loc
   | type_decl :: rest ->
       let var =
         pvar ~loc:type_decl.ptype_name.loc
-          (to_decoder_name type_decl.ptype_name.txt)
+          (name_to_decoder_name type_decl.ptype_name)
       in
       let substitutions =
         match really_recursive Recursive [ type_decl ] with
         | Recursive ->
-            let name = to_decoder_name type_decl.ptype_name.txt in
+            let name = name_to_decoder_name type_decl.ptype_name in
             let substi = Ast_builder.Default.evar ~loc (name ^ "_aux") in
             let new_substitution =
               (core_type_of_type_declaration type_decl, substi)
@@ -368,7 +386,7 @@ let rec mutual_rec_fun_gen ~loc
         else
           List.map
             (fun type_decl ->
-              let name = to_decoder_name type_decl.ptype_name.txt in
+              let name = name_to_decoder_name type_decl.ptype_name in
               pvar ~loc:type_decl.ptype_name.loc name)
             rest
       in
@@ -376,10 +394,10 @@ let rec mutual_rec_fun_gen ~loc
       let dec = [%stri let [%p var] = [%e imple_as_lambda]] in
       let substi =
         pexp_apply ~loc
-          (evar ~loc (to_decoder_name type_decl.ptype_name.txt))
+          (evar ~loc (name_to_decoder_name type_decl.ptype_name))
           (List.map
              (fun decl ->
-               (Nolabel, evar ~loc (to_decoder_name decl.ptype_name.txt)))
+               (Nolabel, evar ~loc (name_to_decoder_name decl.ptype_name)))
              rest)
       in
       let new_substitution =
@@ -421,10 +439,10 @@ let str_gens ~(loc : location) ~(path : label)
   let _path = path in
   match (really_recursive rec_flag type_decls, type_decls) with
   | Nonrecursive, _ ->
-      List.(flatten (map (single_type_decoder_gen ~loc ~rec_flag) type_decls))
+      CCList.flat_map (single_type_decoder_gen ~loc ~rec_flag) type_decls
   | Recursive, [ type_decl ] ->
-      wrap_27 @@ single_type_decoder_gen ~loc ~rec_flag type_decl
+      Utils.wrap_27 @@ single_type_decoder_gen ~loc ~rec_flag type_decl
   | Recursive, _type_decls ->
-      wrap_27
+      Utils.wrap_27
       @@ mutual_rec_fun_gen ~substitutions:[] ~loc type_decls
       @ fix_mutual_rec_funs ~loc type_decls

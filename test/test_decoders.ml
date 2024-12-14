@@ -49,6 +49,9 @@ type a1 = { l : b1 option; m : c1 option }
 and b1 = { n : c1 }
 and c1 = { o : a1 } [@@deriving decoders]
 
+type 'a record_wrapper = { wrapped : 'a } [@@deriving decoders]
+type int_record_wrapper = int record_wrapper [@@deriving decoders]
+
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
   | Ok i -> i = 1234
@@ -118,7 +121,7 @@ let%test "deep tuple" =
   | Error _ -> false
 
 let%test "basic constructor" =
-  match D.decode_string my_basic_cstr_decoder {|{"Int": [10]}|} with
+  match D.decode_string my_basic_cstr_decoder {|{"Int": 10}|} with
   | Ok b -> b = Int 10
   | Error _ -> false
 
@@ -141,7 +144,7 @@ let%test "basic record" =
 let%test "complex record" =
   match
     D.decode_string my_complex_record_decoder
-      {|{"basic" : {"i": 10}, "cstr": {"Int": [10]}}|}
+      {|{"basic" : {"i": 10}, "cstr": {"Int": 10}}|}
   with
   | Ok b -> b = { basic = { i = 10 }; cstr = Int 10 }
   | Error _ -> false
@@ -156,7 +159,7 @@ let%test "simple constructor-less variant" =
   | _ -> false
 
 let%test "mixed constructor/less variant" =
-  (match D.decode_string status_decoder {|{"Online": [10]}|} with
+  (match D.decode_string status_decoder {|{"Online": 10}|} with
   | Ok (Online 10) -> true
   | _ -> false)
   &&
@@ -169,9 +172,12 @@ let%test "my list" =
   | Ok Null -> true
   | _ -> false)
   &&
-  match D.decode_string my_list_decoder {|{"L": [{"Null": {}}]}|} with
+  match D.decode_string my_list_decoder {|{"L": {"Null": {}}}|} with
   | Ok (L Null) -> true
-  | _ -> false
+  | Ok _ -> false
+  | Error e ->
+      print_endline @@ D.string_of_error e;
+      false
 
 let%test "variant w/ record constructor" =
   (match D.decode_string constr_w_rec_decoder {|{"Empty": null}|} with
@@ -220,8 +226,8 @@ let%test "expression mutually-recursive decoder" =
     D.decode_string expr_decoder
       {|{"BinOp" : [
        {"Add": {}},
-       {"BinOp" : [{"Div": {}}, {"Num": [10]}, {"Num": [5]}]},
-       {"BinOp" : [{"Mul": {}}, {"Num": [10]}, {"Num": [3]}]}
+       {"BinOp" : [{"Div": {}}, {"Num": 10}, {"Num": 5}]},
+       {"BinOp" : [{"Mul": {}}, {"Num": 10}, {"Num": 3}]}
        ]}|}
   with
   | Ok (BinOp (Add, BinOp (Div, Num 10, Num 5), BinOp (Mul, Num 10, Num 3))) ->
@@ -230,3 +236,40 @@ let%test "expression mutually-recursive decoder" =
   | Error e ->
       print_endline @@ D.string_of_error e;
       false
+
+let%test "simple type var" =
+  match D.decode_string int_record_wrapper_decoder {|{"wrapped":-2389}|} with
+  | Ok { wrapped = -2389 } -> true
+  | _ -> false
+
+module Blah = struct
+  type t = int [@@deriving decoders]
+end
+
+type blah_wrapped = Blah.t record_wrapper [@@deriving decoders]
+
+let%test "basic module-wrapped type" =
+  match D.decode_string blah_wrapped_decoder {|{"wrapped":10110}|} with
+  | Ok { wrapped = 10110 } -> true
+  | _ -> false
+
+module Outer = struct
+  module Inner = struct
+    type t = string [@@deriving decoders]
+  end
+end
+
+type outer_inner_wrapped = Outer.Inner.t record_wrapper [@@deriving decoders]
+
+let%test "basic module-wrapped type" =
+  match D.decode_string outer_inner_wrapped_decoder {|{"wrapped":"value"}|} with
+  | Ok { wrapped = "value" } -> true
+  | _ -> false
+
+type ('a, 'b) double_wrap = { fst : 'a; snd : 'b } [@@deriving decoders]
+type double_wrapped = (string, int) double_wrap [@@deriving decoders]
+
+let%test "double type var" =
+  match D.decode_string double_wrapped_decoder {|{"fst":"99","snd":100}|} with
+  | Ok { fst = "99"; snd = 100 } -> true
+  | _ -> false
