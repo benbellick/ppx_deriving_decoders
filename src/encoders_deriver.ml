@@ -2,6 +2,16 @@ open Ppxlib
 
 let to_encoder_name i = i ^ "_encoder"
 
+let rec flatten_longident = function
+  | Lident txt -> txt
+  | Ldot (longident, txt) -> flatten_longident longident ^ "." ^ txt
+  | Lapply _ ->
+      (* TODO: when would this happen?  *)
+      failwith "oops"
+
+let longident_to_encoder_name = CCFun.(to_encoder_name % flatten_longident)
+let name_to_encoder_name (i : string loc) = to_encoder_name i.txt
+
 let rec expr_of_typ (typ : core_type) : expression =
   let loc = { typ.ptyp_loc with loc_ghost = true } in
   match typ with
@@ -23,26 +33,35 @@ let rec expr_of_typ (typ : core_type) : expression =
   | [%type: bytes] | [%type: Bytes.t] ->
       failwith "Cannot handle Bytes" (* TODO: figure out strategy *)
   | [%type: [%t? inner_typ] list] ->
-      let list_decoder = Ast_builder.Default.evar ~loc "E.list" in
+      let list_encoder = Ast_builder.Default.evar ~loc "E.list" in
       let sub_expr = expr_of_typ inner_typ in
-      Ast_helper.Exp.apply ~loc list_decoder [ (Nolabel, sub_expr) ]
+      Ast_helper.Exp.apply ~loc list_encoder [ (Nolabel, sub_expr) ]
   | [%type: [%t? inner_typ] array] ->
-      let array_decoder = Ast_builder.Default.evar ~loc "E.array" in
+      let array_encoder = Ast_builder.Default.evar ~loc "E.array" in
       let sub_expr = expr_of_typ inner_typ in
-      Ast_helper.Exp.apply ~loc array_decoder [ (Nolabel, sub_expr) ]
+      Ast_helper.Exp.apply ~loc array_encoder [ (Nolabel, sub_expr) ]
   | [%type: [%t? inner_typ] option] ->
-      let opt_decoder = Ast_builder.Default.evar ~loc "E.nullable" in
+      let opt_encoder = Ast_builder.Default.evar ~loc "E.nullable" in
       let sub_expr = expr_of_typ (* ~substitutions *) inner_typ in
-      Ast_helper.Exp.apply ~loc opt_decoder [ (Nolabel, sub_expr) ]
+      Ast_helper.Exp.apply ~loc opt_encoder [ (Nolabel, sub_expr) ]
   | { ptyp_desc = Ptyp_tuple typs; _ } -> expr_of_tuple ~loc typs
+  | { ptyp_desc = Ptyp_var var; _ } ->
+      Ast_builder.Default.evar ~loc @@ to_encoder_name var
   | { ptyp_desc = Ptyp_constr ({ txt = Lident lid; _ }, []); _ } ->
       (* The assumption here is that if we get to this point, this type is recursive, and
          we just assume that we already have an encoder available.
          TODO: Is this really the case?
       *)
       Ast_builder.Default.evar ~loc (to_encoder_name lid)
+  | { ptyp_desc = Ptyp_constr ({ txt = longident; _ }, args); _ } ->
+      let cstr_dec =
+        Ast_builder.Default.evar ~loc @@ longident_to_encoder_name longident
+      in
+
+      let arg_decs = CCList.map expr_of_typ args in
+      Ast_builder.Default.eapply ~loc cstr_dec arg_decs
   | _ ->
-      Location.raise_errorf ~loc "Cannot construct decoder for %s"
+      Location.raise_errorf ~loc "Cannot construct encoder for %s"
         (string_of_core_type typ)
 
 and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
@@ -184,23 +203,45 @@ let implementation_generator ~(loc : location) type_decl : expression =
   in
   imple_expr
 
-let single_type_decoder_gen ~(loc : location) type_decl =
+let single_type_encoder_gen ~(loc : location) type_decl =
   let imple = implementation_generator ~loc type_decl in
   let name = to_encoder_name type_decl.ptype_name.txt in
   let pat = Ast_builder.Default.pvar ~loc name in
+  let params =
+    (* TODO: can we drop the non type vars? What are these? *)
+    CCList.filter_map
+      (fun (param, _) ->
+        match param.ptyp_desc with Ptyp_var var -> Some var | _ -> None)
+      type_decl.ptype_params
+  in
+  let args =
+    CCList.map
+      (fun param -> Ast_builder.Default.pvar ~loc (to_encoder_name param))
+      params
+  in
+  let imple =
+    (* We need the type variables to become arguments *)
+    CCList.fold_left
+      (fun impl arg -> [%expr fun [%p arg] -> [%e impl]])
+      imple args
+  in
   Ast_builder.Default.value_binding ~loc ~pat ~expr:imple
+(* [%str let [%p Ast_builder.Default.pvar ~loc name] = [%e imple]] *)
 
 let str_gens ~(loc : location) ~(path : label)
     ((rec_flag : rec_flag), type_decls) : structure_item list =
   let _path = path in
+  let rec_flag = really_recursive rec_flag type_decls in
+
+  (* CCList.flat_map (single_type_encoder_gen ~loc ~rec_flag) type_decls *)
   match (really_recursive rec_flag type_decls, type_decls) with
   | Nonrecursive, _ ->
       [
         (Ast_builder.Default.pstr_value ~loc Nonrecursive
-        @@ List.(map (single_type_decoder_gen ~loc) type_decls));
+        @@ List.(map (single_type_encoder_gen ~loc) type_decls));
       ]
   | Recursive, type_decls ->
       [
         (Ast_builder.Default.pstr_value ~loc Recursive
-        @@ List.(map (single_type_decoder_gen ~loc) type_decls));
+        @@ List.(map (single_type_encoder_gen ~loc) type_decls));
       ]

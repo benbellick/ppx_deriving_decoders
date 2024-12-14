@@ -49,6 +49,9 @@ type a1 = { l : b1 option; m : c1 option }
 and b1 = { n : c1 }
 and c1 = { o : a1 } [@@deriving decoders]
 
+type 'a record_wrapper = { wrapped : 'a } [@@deriving decoders]
+type int_record_wrapper = int record_wrapper [@@deriving decoders]
+
 let%test "int" =
   match D.decode_string my_int_decoder "1234" with
   | Ok i -> i = 1234
@@ -233,3 +236,42 @@ let%test "expression mutually-recursive decoder" =
   | Error e ->
       print_endline @@ D.string_of_error e;
       false
+
+let%test "simple type var" =
+  match D.decode_string int_record_wrapper_decoder {|{"wrapped":-2389}|} with
+  | Ok { wrapped = -2389 } -> true
+  | _ -> false
+
+module Blah = struct
+  type t = int [@@deriving decoders]
+end
+
+type blah_wrapped = Blah.t record_wrapper [@@deriving decoders]
+
+let%test "basic module-wrapped type" =
+  match D.decode_string blah_wrapped_decoder {|{"wrapped":10110}|} with
+  | Ok { wrapped = 10110 } -> true
+  | _ -> false
+
+module Outer = struct
+  module Inner = struct
+    type t = string [@@deriving decoders]
+  end
+end
+
+type outer_inner_wrapped = Outer.Inner.t record_wrapper [@@deriving decoders]
+
+let%test "basic module-wrapped type" =
+  match D.decode_string outer_inner_wrapped_decoder {|{"wrapped":"value"}|} with
+  | Ok { wrapped = "value" } -> true
+  | _ -> false
+
+type ('a, 'b) double_wrap = { fst : 'a; snd : 'b } [@@deriving decoders]
+type double_wrapped = (string, int) double_wrap [@@deriving decoders]
+
+let%test "double type var" =
+  match
+    D.decode_string double_wrapped_decoder {|{"fst":99,"snd":"another"}|}
+  with
+  | Ok { fst = 99; snd = "another" } -> true
+  | _ -> false
