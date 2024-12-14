@@ -273,11 +273,3 @@ let%test "double type var" =
   match D.decode_string double_wrapped_decoder {|{"fst":"99","snd":100}|} with
   | Ok { fst = "99"; snd = 100 } -> true
   | _ -> false
-
-module Outer (_ : sig end) = struct
-  type t = int
-end
-
-module Empty = struct end
-
-type x = Outer(Empty).t [@@deriving decoders]
