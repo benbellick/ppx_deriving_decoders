@@ -273,3 +273,40 @@ let%test "double type var" =
   match D.decode_string double_wrapped_decoder {|{"fst":"99","snd":100}|} with
   | Ok { fst = "99"; snd = 100 } -> true
   | _ -> false
+
+module Ints = struct
+  type my_int32 = int32 [@@deriving decoders]
+
+  let%test "int32" =
+    match D.decode_string my_int32_decoder "123445" with
+    | Ok 123445l -> true
+    | _ -> false
+
+  type my_int32t = Int32.t [@@deriving decoders]
+
+  let%test "int32t" =
+    match D.decode_string my_int32t_decoder "5438" with
+    | Ok 5438l -> true
+    | _ -> false
+
+  type my_int64 = int64 [@@deriving decoders]
+
+  let%test "int64" =
+    match D.decode_string my_int64_decoder "123445" with
+    | Ok 123445L -> true
+    | _ -> false
+
+  type my_int64t = Int64.t [@@deriving decoders]
+
+  let%test "int64t" =
+    match D.decode_string my_int64t_decoder "5438" with
+    | Ok 5438L -> true
+    | _ -> false
+
+  type my_nativeint = Nativeint.t [@@deriving decoders]
+
+  let%test "my_nativeint" =
+    match D.decode_string my_nativeint_decoder "5438" with
+    | Ok 5438n -> true
+    | _ -> false
+end

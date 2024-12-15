@@ -67,13 +67,21 @@ let rec expr_of_typ (typ : core_type)
   match typ with
   | [%type: unit] | [%type: unit] -> Ast_builder.Default.evar ~loc "D.null"
   | [%type: int] -> Ast_builder.Default.evar ~loc "D.int"
-  | [%type: int32]
-  | [%type: Int32.t]
-  | [%type: int64]
-  | [%type: Int64.t]
-  | [%type: nativeint]
-  | [%type: Nativeint.t] ->
-      failwith "Cannot yet handle any int-like but int"
+  | [%type: int32] | [%type: Int32.t] ->
+      let int_dec = Ast_builder.Default.evar ~loc "D.int" in
+      [%expr
+        let open D.Infix in
+        [%e int_dec] >|= Int32.of_int]
+  | [%type: int64] | [%type: Int64.t] ->
+      let int_dec = Ast_builder.Default.evar ~loc "D.int" in
+      [%expr
+        let open D.Infix in
+        [%e int_dec] >|= Int64.of_int]
+  | [%type: nativeint] | [%type: Nativeint.t] ->
+      let int_dec = Ast_builder.Default.evar ~loc "D.int" in
+      [%expr
+        let open D.Infix in
+        [%e int_dec] >|= Nativeint.of_int]
   | [%type: float] -> Ast_builder.Default.evar ~loc "D.float"
   | [%type: bool] -> Ast_builder.Default.evar ~loc "D.bool"
   | [%type: char] ->
