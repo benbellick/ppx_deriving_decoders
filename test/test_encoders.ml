@@ -98,3 +98,40 @@ let%test "module wrapped" =
   match E.encode_string outer_inner_wrapped_encoder { wrapped = "a thing" } with
   | {|{"wrapped":"a thing"}|} -> true
   | _ -> false
+
+module Ints = struct
+  type my_int32 = int32 [@@deriving encoders]
+
+  let%test "int32" =
+    match E.encode_string my_int32_encoder 123445l with
+    | "123445" -> true
+    | _ -> false
+
+  type my_int32t = Int32.t [@@deriving encoders]
+
+  let%test "int32t" =
+    match E.encode_string my_int32t_encoder 5438l with
+    | "5438" -> true
+    | _ -> false
+
+  type my_int64 = int64 [@@deriving encoders]
+
+  let%test "int64" =
+    match E.encode_string my_int64_encoder 123445L with
+    | "123445" -> true
+    | _ -> false
+
+  type my_int64t = Int64.t [@@deriving encoders]
+
+  let%test "int64t" =
+    match E.encode_string my_int64t_encoder 5438L with
+    | "5438" -> true
+    | _ -> false
+
+  type my_nativeint = Nativeint.t [@@deriving encoders]
+
+  let%test "my_nativeint" =
+    match E.encode_string my_nativeint_encoder 5438n with
+    | "5438" -> true
+    | _ -> false
+end

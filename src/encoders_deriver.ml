@@ -20,13 +20,15 @@ let rec expr_of_typ (typ : core_type) : expression =
   match typ with
   | [%type: unit] | [%type: unit] -> Ast_builder.Default.evar ~loc "E.null"
   | [%type: int] -> Ast_builder.Default.evar ~loc "E.int"
-  | [%type: int32]
-  | [%type: Int32.t]
-  | [%type: int64]
-  | [%type: Int64.t]
-  | [%type: nativeint]
-  | [%type: Nativeint.t] ->
-      failwith "Cannot yet handle any int-like but int"
+  | [%type: int32] | [%type: Int32.t] ->
+      let int_enc = Ast_builder.Default.evar ~loc "E.int" in
+      [%expr fun i -> i |> Int32.to_int |> [%e int_enc]]
+  | [%type: int64] | [%type: Int64.t] ->
+      let int_enc = Ast_builder.Default.evar ~loc "E.int" in
+      [%expr fun i -> i |> Int64.to_int |> [%e int_enc]]
+  | [%type: nativeint] | [%type: Nativeint.t] ->
+      let int_enc = Ast_builder.Default.evar ~loc "E.int" in
+      [%expr fun i -> i |> Nativeint.to_int |> [%e int_enc]]
   | [%type: float] -> Ast_builder.Default.evar ~loc "E.float"
   | [%type: bool] -> Ast_builder.Default.evar ~loc "E.bool"
   | [%type: char] ->
