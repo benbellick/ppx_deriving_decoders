@@ -141,6 +141,10 @@ let rec expr_of_typ (typ : core_type)
       Location.raise_errorf ~loc
         "Cannot construct decoder for %s: cannot decode objects"
         (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_package _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct decoder for %s: cannot decode packages"
+        (string_of_core_type typ)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)
