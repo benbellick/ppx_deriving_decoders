@@ -154,8 +154,17 @@ let rec expr_of_typ (typ : core_type)
       Location.raise_errorf ~loc
         "Cannot construct decoder for %s: cannot decode wildcard in type "
         (string_of_core_type typ)
-  | _ ->
-      Location.raise_errorf ~loc "Cannot construct decoder for %s"
+  | { ptyp_desc = Ptyp_alias _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct decoder for %s: cannot decode type alias"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_variant _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct decoder for %s: cannot decode polymorphic variant"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_extension _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct decoder for %s: cannot decode type extension point"
         (string_of_core_type typ)
 
 and expr_of_tuple ~loc ~substitutions ?lift typs =

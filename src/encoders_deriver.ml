@@ -86,12 +86,21 @@ let rec expr_of_typ (typ : core_type) : expression =
         "Cannot construct encoder for %s: cannot encode explicitly polymorphic \
          types"
         (string_of_core_type typ)
-  | { ptyp_desc = Ptyp_any _; _ } ->
+  | { ptyp_desc = Ptyp_any; _ } ->
       Location.raise_errorf ~loc
         "Cannot construct encoder for %s: cannot encode wildcard in type "
         (string_of_core_type typ)
-  | _ ->
-      Location.raise_errorf ~loc "Cannot construct encoder for %s"
+  | { ptyp_desc = Ptyp_alias _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode type alias"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_variant _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode polymorphic variant"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_extension _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode type extension point"
         (string_of_core_type typ)
 
 and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
