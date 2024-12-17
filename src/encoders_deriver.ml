@@ -81,6 +81,11 @@ let rec expr_of_typ (typ : core_type) : expression =
       Location.raise_errorf ~loc
         "Cannot construct encoder for %s: cannot encode packages"
         (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_poly _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode explicitly polymorphic \
+         types"
+        (string_of_core_type typ)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct encoder for %s"
         (string_of_core_type typ)
