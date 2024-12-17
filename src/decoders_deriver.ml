@@ -93,7 +93,7 @@ let rec expr_of_typ (typ : core_type)
   | [%type: string] | [%type: String.t] ->
       Ast_builder.Default.evar ~loc "D.string"
   | [%type: bytes] | [%type: Bytes.t] ->
-      failwith "Cannot handle Bytes" (* TODO: figure out strategy *)
+      Location.raise_errorf ~loc "Cannot construct a decoder for bytes"
   | [%type: [%t? inner_typ] list] ->
       let list_decoder = Ast_builder.Default.evar ~loc "D.list" in
       let sub_expr = expr_of_typ ~substitutions inner_typ in
@@ -107,11 +107,6 @@ let rec expr_of_typ (typ : core_type)
       let sub_expr = expr_of_typ ~substitutions inner_typ in
       Ast_helper.Exp.apply ~loc opt_decoder [ (Nolabel, sub_expr) ]
   | { ptyp_desc = Ptyp_tuple typs; _ } -> expr_of_tuple ~substitutions ~loc typs
-  (* | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc; _ } -> _ *)
-  (* | { ptyp_desc = Ptyp_alias _; _ } -> *)
-  (*     failwith *)
-  (*       (Format.sprintf "This alias was a failure...: %s\n" *)
-  (*          (string_of_core_type typ)) *)
   | { ptyp_desc = Ptyp_constr ({ txt = longident; loc = typ_loc }, []); _ } as
     other_type -> (
       (* In the case where our type is truly recursive, we need to instead do `type_aux ()` *)
@@ -134,8 +129,6 @@ let rec expr_of_typ (typ : core_type)
 
       let arg_decs = CCList.map (expr_of_typ ~substitutions) args in
       Ast_builder.Default.eapply ~loc cstr_dec arg_decs
-      (* Location.raise_errorf ~loc "Cannot constructor decoder for %s" *)
-      (*   (string_of_core_type typ) *)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)

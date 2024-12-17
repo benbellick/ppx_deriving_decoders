@@ -35,7 +35,7 @@ let rec expr_of_typ (typ : core_type) : expression =
   | [%type: string] | [%type: String.t] ->
       Ast_builder.Default.evar ~loc "E.string"
   | [%type: bytes] | [%type: Bytes.t] ->
-      failwith "Cannot handle Bytes" (* TODO: figure out strategy *)
+      Location.raise_errorf ~loc "Cannot construct an encoder for bytes"
   | [%type: [%t? inner_typ] list] ->
       let list_encoder = Ast_builder.Default.evar ~loc "E.list" in
       let sub_expr = expr_of_typ inner_typ in
