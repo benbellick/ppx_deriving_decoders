@@ -71,7 +71,11 @@ let rec expr_of_typ (typ : core_type) : expression =
         (string_of_core_type typ)
   | { ptyp_desc = Ptyp_object _; _ } ->
       Location.raise_errorf ~loc
-        "Cannot construct encoder for %s: cannot (yet) encode objects"
+        "Cannot construct encoder for %s: cannot  encode objects"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_class _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot  encode classes"
         (string_of_core_type typ)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct encoder for %s"
