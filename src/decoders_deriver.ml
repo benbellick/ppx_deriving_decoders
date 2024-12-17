@@ -150,6 +150,10 @@ let rec expr_of_typ (typ : core_type)
         "Cannot construct decoder for %s: cannot decode explicitly polymorphic \
          types"
         (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_any; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct decoder for %s: cannot decode wildcard in type "
+        (string_of_core_type typ)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)
