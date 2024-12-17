@@ -85,7 +85,11 @@ let rec expr_of_typ (typ : core_type)
   | [%type: float] -> Ast_builder.Default.evar ~loc "D.float"
   | [%type: bool] -> Ast_builder.Default.evar ~loc "D.bool"
   | [%type: char] ->
-      failwith "Cannot directly handle character; please cast to string first"
+      [%expr
+        let open D.Infix in
+        D.string >>= fun s ->
+        if String.length s = 1 then D.succeed @@ String.get s 0
+        else D.fail "Expected a string of length 1"]
   | [%type: string] | [%type: String.t] ->
       Ast_builder.Default.evar ~loc "D.string"
   | [%type: bytes] | [%type: Bytes.t] ->

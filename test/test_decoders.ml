@@ -1,9 +1,6 @@
 module D = Decoders_yojson.Safe.Decode
 
 type my_int = int [@@deriving decoders]
-
-(* type my_int32 = int32 [@@deriving decoders] *)
-(* type my_int64 = int64 [@@deriving decoders] *)
 type my_float = float [@@deriving decoders]
 type my_string = string [@@deriving decoders]
 type my_bool = bool [@@deriving decoders]
@@ -310,3 +307,15 @@ module Ints = struct
     | Ok 5438n -> true
     | _ -> false
 end
+
+type my_char = char [@@deriving decoders]
+
+let%test "char" =
+  (match D.decode_string my_char_decoder {|"c"|} with
+  | Ok 'c' -> true
+  | _ -> false)
+  &&
+  match D.decode_string my_char_decoder {|"abc"|} with
+  (* We expect an error here because the string must have length 1 *)
+  | Error _ -> true
+  | _ -> false
