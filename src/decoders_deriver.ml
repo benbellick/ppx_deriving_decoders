@@ -129,6 +129,10 @@ let rec expr_of_typ (typ : core_type)
 
       let arg_decs = CCList.map (expr_of_typ ~substitutions) args in
       Ast_builder.Default.eapply ~loc cstr_dec arg_decs
+  | { ptyp_desc = Ptyp_arrow _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct decoder for %s: you cannot decode functions"
+        (string_of_core_type typ)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
         (string_of_core_type typ)

@@ -65,6 +65,10 @@ let rec expr_of_typ (typ : core_type) : expression =
 
       let arg_decs = CCList.map expr_of_typ args in
       Ast_builder.Default.eapply ~loc cstr_dec arg_decs
+  | { ptyp_desc = Ptyp_arrow _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: you cannot encode functions"
+        (string_of_core_type typ)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct encoder for %s"
         (string_of_core_type typ)
