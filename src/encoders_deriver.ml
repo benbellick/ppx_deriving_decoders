@@ -35,7 +35,7 @@ let rec expr_of_typ (typ : core_type) : expression =
   | [%type: string] | [%type: String.t] ->
       Ast_builder.Default.evar ~loc "E.string"
   | [%type: bytes] | [%type: Bytes.t] ->
-      failwith "Cannot handle Bytes" (* TODO: figure out strategy *)
+      Location.raise_errorf ~loc "Cannot construct an encoder for bytes"
   | [%type: [%t? inner_typ] list] ->
       let list_encoder = Ast_builder.Default.evar ~loc "E.list" in
       let sub_expr = expr_of_typ inner_typ in
@@ -65,8 +65,42 @@ let rec expr_of_typ (typ : core_type) : expression =
 
       let arg_decs = CCList.map expr_of_typ args in
       Ast_builder.Default.eapply ~loc cstr_dec arg_decs
-  | _ ->
-      Location.raise_errorf ~loc "Cannot construct encoder for %s"
+  | { ptyp_desc = Ptyp_arrow _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode functions"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_object _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode objects"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_class _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode classes"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_package _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode packages"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_poly _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode explicitly polymorphic \
+         types"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_any; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode wildcard in type "
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_alias _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode type alias"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_variant _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode polymorphic variant"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_extension _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct encoder for %s: cannot encode type extension point"
         (string_of_core_type typ)
 
 and expr_of_tuple ~loc (* ~substitutions ?lift *) typs =
