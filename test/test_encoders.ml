@@ -135,3 +135,8 @@ module Ints = struct
     | "5438" -> true
     | _ -> false
 end
+
+type my_char = char [@@deriving encoders]
+
+let%test "char" =
+  match E.encode_string my_char_encoder 'c' with {|"c"|} -> true | _ -> false

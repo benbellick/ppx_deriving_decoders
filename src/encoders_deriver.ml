@@ -31,8 +31,7 @@ let rec expr_of_typ (typ : core_type) : expression =
       [%expr fun i -> i |> Nativeint.to_int |> [%e int_enc]]
   | [%type: float] -> Ast_builder.Default.evar ~loc "E.float"
   | [%type: bool] -> Ast_builder.Default.evar ~loc "E.bool"
-  | [%type: char] ->
-      failwith "Cannot directly handle character; please cast to string first"
+  | [%type: char] -> [%expr fun c -> E.string (String.make 1 c)]
   | [%type: string] | [%type: String.t] ->
       Ast_builder.Default.evar ~loc "E.string"
   | [%type: bytes] | [%type: Bytes.t] ->
