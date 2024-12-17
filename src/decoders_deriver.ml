@@ -131,7 +131,11 @@ let rec expr_of_typ (typ : core_type)
       Ast_builder.Default.eapply ~loc cstr_dec arg_decs
   | { ptyp_desc = Ptyp_arrow _; _ } ->
       Location.raise_errorf ~loc
-        "Cannot construct decoder for %s: you cannot decode functions"
+        "Cannot construct decoder for %s: cannot decode functions"
+        (string_of_core_type typ)
+  | { ptyp_desc = Ptyp_object _; _ } ->
+      Location.raise_errorf ~loc
+        "Cannot construct decoder for %s: cannot decode objects"
         (string_of_core_type typ)
   | _ ->
       Location.raise_errorf ~loc "Cannot construct decoder for %s"
