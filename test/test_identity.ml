@@ -35,11 +35,12 @@ module Expression = struct
     open OnJson
 
     let id = make_id t_encoder t_decoder
-    let%test "expr_inv:json:1" = check id {|{"Int":15}|}
-    let%test "expr_inv:json:2" = check id {|{"Add":[{"Int":12},{"Int":15}]}|}
+    let check = check id
+    let%test "expr_inv:json:1" = check {|{"Int":15}|}
+    let%test "expr_inv:json:2" = check {|{"Add":[{"Int":12},{"Int":15}]}|}
 
     let%test "expr_inv:json:3" =
-      check id
+      check
         {|{"Mul":[{"Sub":[{"Real":-12043.1235},{"Int":4932}]},{"Div":[{"Int":-123},{"Real":5932.1239}]}]}|}
   end
 
@@ -47,10 +48,11 @@ module Expression = struct
     open OnValue
 
     let id = make_id t_encoder t_decoder
-    let%test "expr_inv:value:1" = check id (Int 10)
+    let check = check id
+    let%test "expr_inv:value:1" = check (Int 10)
 
     let%test "expr_inv:value:2" =
-      check id
+      check
         (Add
            ( Add (Int 10, Int (-5)),
              Div (Real 1.4929, Sub (Real (-5392.1239230), Int 58292349823)) ))
