@@ -1,16 +1,18 @@
 # ppx_deriving_decoders: Automatically write mattjbray/ocaml-decoders
 
-[mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders) is an excellent library for writing decoders using decoding combinators. However, writing out decoders by hand for more complicated types can be quite time-intensive. 
-  
-This library helps by automatically producing the appropriate decoder (and encoder!) for a particular type. 
+There are currently two major flavors of handling encoding and decoding data in OCaml.
+
+1. You can use something like [ppx_deriving_yojson](https://github.com/ocaml-ppx/ppx_deriving_yojson) to automatically generate encoders/decoders for your OCaml types, which works great! However, it gives some tough errors and there is limited customization of the decoders.
+2. You can use the a library like [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders) to hand-write your encoders/decoders, which offers great errors and quite expansive customization! However, writing out encoders/decoders for all of your types is a lot of work. 
+
+What if there was a way to get the best of both worlds?
+
+This library helps streamline the process of using [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders) by writing your encoders/decoders for you! Now, when you don't care about the implementation details of serializing/deserializing to e.g. JSON, you can just use the ppx to write the functions for you. But if you do care, you can generate a starting implementation and adjust it according to your preferences. 
 
 There are two primary ways in which this library can be of use. (More details of both follows.)
 
 1. "I want to write a (e.g. JSON) decoder for a particular type but don't care about the details" --> You can then use this library via `[@@deriving decoders]` applied to your types. 
 2. "I want to write a (e.g. JSON) decoder for a particular type, but I care a lot about how it works and just want a good starting place" --> You can use this library via `[@@deriving_inline decoders]` applied to your types to generate the implementation in place.
-
-> [!WARNING]
-> This is still a fairly experimental library. Use at your own risk! If you would like to use it and be extra safe, use approach 2 above, by using the library to generate boilerplate and then removing the dependency in production code. 
 
 ## Getting Started
 
@@ -18,7 +20,7 @@ There are two primary ways in which this library can be of use. (More details of
 opam install ppx_deriving_decoders
 ```
 
-The implementation is agnostic to the underlying decoders back-end. The only requirement is the presence of a module with the signature [`Decoders.Decode.S`](https://github.com/mattjbray/ocaml-decoders/blob/59c0dfbe6026af27fce96af82e650a875157385d/src/sig.ml#L8) as specified in [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders), which is aliased to module `D`.
+The implementation is agnostic to the underlying decoders back-end. The only requirement is the presence of a module with the signature [`Decoders.Decode.S`](https://github.com/mattjbray/ocaml-decoders/blob/59c0dfbe6026af27fce96af82e650a875157385d/src/sig.ml#L8) as specified in [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders), which is aliased to module `D` (for decoders, for encoders you need the corresponding implementation aliased to `E`).
 
 E.g., if you wanted to decode using `yojson`, you could use 
 ```
@@ -51,7 +53,7 @@ type bar = Int of int | String of string [@@deriving decoders]
 After doing this, you will have available in this module a value `bar_decoder` of type `bar D.decoder`. Then you'll be able to use this decoder freely, e.g.:
 ```ocaml
 let () = assert (
-  match D.decode_string my_basic_cstr_decoder {|{"Int": [10]}|} with
+  match D.decode_string bar_decoder {|{"Int": 10}|} with
   | Ok b -> b = Int 10
   | Error _ -> false
 )
@@ -206,6 +208,186 @@ let _ = record_wrapper_encoder
 
 Of course, you can generate both by using `[@@deriving_inline decoders, encoders]` or `[@@deriving decoders, encoders]`. The corresponding pair will be inverses of one another provided that all prior referenced decoder/encoder pairs are inverses!
 
+
+## Example Workflow
+
+Suppose you wanted to start gathering trading data from [Tiingo](https://app.tiingo.com/welcome). So you navigate over to the [End-of-Day Rest API Endpoint](https://www.tiingo.com/documentation/end-of-day). You're going to need to decode this JSON. First what you're going to do is match your type exactly to the expected shape:
+```ocaml
+module EndOfDay = struct
+  type t = {
+    date : string;
+    close : float;
+    high : float;
+    low : float;
+    open : float;
+    volume : int;
+    adjClose : int;
+    adjHigh : float;
+    adjLow : float;
+    adjOpen : float;
+    adjVolume : int;
+    divCash : float;
+    splitFactor : float;
+  }
+end
+```
+However, `open` is a reserved keyword in OCaml, and the idiomatic solution is to append an underscore. Now you can apply your decoder:
+```ocaml
+module EndOfDay = struct
+  type t = {
+    date : string;
+    close : float;
+    high : float;
+    low : float;
+    open_ : float;
+    volume : int;
+    adjClose : int;
+    adjHigh : float;
+    adjLow : float;
+    adjOpen : float;
+    adjVolume : int;
+    divCash : float;
+    splitFactor : float;
+  }
+  [@@deriving decoders]
+end
+```
+But of course, this is going to generate a decoder which expects a field called `"open_"` rather than the intended `"open"`! So, you customize your decoder by generating it inline:
+```
+module EndOfDay = struct
+  type t = {
+    date : string;
+    close : float;
+    high : float;
+    low : float;
+    open_ : float;
+    volume : int;
+    adjClose : int;
+    adjHigh : float;
+    adjLow : float;
+    adjOpen : float;
+    adjVolume : int;
+    divCash : float;
+    splitFactor : float;
+  }
+  [@@deriving_inline decoders]
+  [@@@deriving.end]
+end
+```
+You apply `dune build --auto-promote` (followed by `ocamlformat`) and get:
+```ocaml
+module EndOfDay = struct
+  type t = {
+    date : string;
+    close : float;
+    high : float;
+    low : float;
+    open_ : float;
+    volume : int;
+    adjClose : int;
+    adjHigh : float;
+    adjLow : float;
+    adjOpen : float;
+    adjVolume : int;
+    divCash : float;
+    splitFactor : float;
+  }
+  [@@deriving_inline decoders]
+
+  let _ = fun (_ : t) -> ()
+
+  let t_decoder =
+    let open D in
+    let open D.Infix in
+    let* date = field "date" D.string in
+    let* close = field "close" D.float in
+    let* high = field "high" D.float in
+    let* low = field "low" D.float in
+    let* open_ = field "open_" D.float in
+    let* volume = field "volume" D.int in
+    let* adjClose = field "adjClose" D.int in
+    let* adjHigh = field "adjHigh" D.float in
+    let* adjLow = field "adjLow" D.float in
+    let* adjOpen = field "adjOpen" D.float in
+    let* adjVolume = field "adjVolume" D.int in
+    let* divCash = field "divCash" D.float in
+    let* splitFactor = field "splitFactor" D.float in
+    succeed
+      {
+        date;
+        close;
+        high;
+        low;
+        open_;
+        volume;
+        adjClose;
+        adjHigh;
+        adjLow;
+        adjOpen;
+        adjVolume;
+        divCash;
+        splitFactor;
+      }
+
+  let _ = t_decoder
+
+  [@@@deriving.end]
+end
+```
+And now, fixing it is as easy as adjusting the argument to `field` above for the value `open_`!
+```ocaml
+module EndOfDay = struct
+  type t = {
+    date : string;
+    close : float;
+    high : float;
+    low : float;
+    open_ : float;
+    volume : int;
+    adjClose : int;
+    adjHigh : float;
+    adjLow : float;
+    adjOpen : float;
+    adjVolume : int;
+    divCash : float;
+    splitFactor : float;
+  }
+
+  let t_decoder =
+    let open D in
+    let open D.Infix in
+    let* date = field "date" D.string in
+    let* close = field "close" D.float in
+    let* high = field "high" D.float in
+    let* low = field "low" D.float in
+    let* open_ = field "open" D.float in
+    let* volume = field "volume" D.int in
+    let* adjClose = field "adjClose" D.int in
+    let* adjHigh = field "adjHigh" D.float in
+    let* adjLow = field "adjLow" D.float in
+    let* adjOpen = field "adjOpen" D.float in
+    let* adjVolume = field "adjVolume" D.int in
+    let* divCash = field "divCash" D.float in
+    let* splitFactor = field "splitFactor" D.float in
+    succeed
+      {
+        date;
+        close;
+        high;
+        low;
+        open_;
+        volume;
+        adjClose;
+        adjHigh;
+        adjLow;
+        adjOpen;
+        adjVolume;
+        divCash;
+        splitFactor;
+      }
+end
+```
+And now you see, generating the appropriate decoder took no more than 5 seconds once `ppx_deriving_decoders` is installed! 
 
 ## Limitations
 - Some of the decoders can be quite complicated relative to what you would write by hand
