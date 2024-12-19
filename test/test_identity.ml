@@ -59,11 +59,27 @@ module Expression = struct
   end
 end
 
-(* type my_list = Null | L of my_list [@@deriving decoders, encoders] *)
+module MyList = struct
+  type t = Null | L of t [@@deriving decoders, encoders]
 
-(* let my_list_id = make_id my_list_encoder my_list_decoder *)
-(* let%test "my_list:1" = check my_list_id Null *)
-(* let%test "my_list:2" = check my_list_id (L (L (L (L Null)))) *)
+  module OnJson = struct
+    open OnJson
+
+    let id = make_id t_encoder t_decoder
+    let check = check id
+    let%test "my_list:json:1" = check {|{"Null":null}|}
+    let%test "my_list:value:2" = check {|{"L":{"L":{"L":{"Null":null}}}}|}
+  end
+
+  module OnValue = struct
+    open OnValue
+
+    let id = make_id t_encoder t_decoder
+    let check = check id
+    let%test "my_list:value:1" = check Null
+    let%test "my_list:value:2" = check (L (L (L (L Null))))
+  end
+end
 
 (* type a_rec = { b : b_rec option } *)
 (* and b_rec = { a : a_rec option } [@@deriving decoders, encoders] *)
