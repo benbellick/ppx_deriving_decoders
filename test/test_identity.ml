@@ -81,8 +81,28 @@ module MyList = struct
   end
 end
 
-(* type a_rec = { b : b_rec option } *)
-(* and b_rec = { a : a_rec option } [@@deriving decoders, encoders] *)
+module BasicRec = struct
+  type a = { b : b option }
+  and b = { a : a option } [@@deriving decoders, encoders]
+
+  module OnJson = struct
+    open OnJson
+
+    let id = make_id a_encoder a_decoder
+    let check = check id
+    let%test "a_rec:value:1" = check {|{"b":null}|}
+    let%test "a_rec:value:2" = check {|{"b":{"a":{"b":{"a":null}}}}|}
+  end
+
+  module OnValue = struct
+    open OnValue
+
+    let id = make_id a_encoder a_decoder
+    let check = check id
+    let%test "a_rec:value:1" = check { b = None }
+    let%test "a_rec:value:2" = check { b = Some { a = None } }
+  end
+end
 
 (* let a_rec_id = make_id a_rec_encoder a_rec_decoder *)
 (* let%test "a_rec:1" = check a_rec_id { b = None } *)
