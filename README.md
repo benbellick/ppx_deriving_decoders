@@ -53,7 +53,7 @@ type bar = Int of int | String of string [@@deriving decoders]
 After doing this, you will have available in this module a value `bar_decoder` of type `bar D.decoder`. Then you'll be able to use this decoder freely, e.g.:
 ```ocaml
 let () = assert (
-  match D.decode_string my_basic_cstr_decoder {|{"Int": [10]}|} with
+  match D.decode_string bar_decoder {|{"Int": 10}|} with
   | Ok b -> b = Int 10
   | Error _ -> false
 )
