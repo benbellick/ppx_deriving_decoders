@@ -188,8 +188,7 @@ and expr_of_variant ~loc cstrs =
             CCList.map
               (fun { pld_name; _ } ->
                 ( { txt = Lident pld_name.txt; loc },
-                  Ast_builder.Default.pvar ~loc
-                    (*TODO: is this right loc*) pld_name.txt ))
+                  Ast_builder.Default.pvar ~loc pld_name.txt ))
               lbl_decls
           in
           Some (Ast_builder.Default.ppat_record ~loc arg_fields Closed)
@@ -233,8 +232,7 @@ let implementation_generator ~(loc : location) type_decl : expression =
           CCList.map
             (fun { pld_name; _ } ->
               ( { txt = Lident pld_name.txt; loc },
-                Ast_builder.Default.pvar ~loc
-                  (*TODO: is this right loc*) pld_name.txt ))
+                Ast_builder.Default.pvar ~loc pld_name.txt ))
             label_decs
         in
         let args = Ast_builder.Default.ppat_record ~loc arg_fields Closed in
