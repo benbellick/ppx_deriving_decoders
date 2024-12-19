@@ -1,6 +1,24 @@
 module D = Decoders_yojson.Safe.Decode
 module E = Decoders_yojson.Safe.Encode
 
+module OnJson = struct
+  let make_id enc dec =
+    let str_enc = E.encode_string enc in
+    let str_dec = D.decode_string dec in
+    CCFun.(str_dec % str_enc)
+
+  let check id j = match id j with Ok j' when j = j' -> true | _ -> false
+end
+
+module OnValue = struct
+  let make_id enc dec =
+    let str_enc = E.encode_string enc in
+    let str_dec = D.decode_string dec in
+    CCFun.(str_enc % str_dec)
+
+  let check id v = match id v with Ok v' when v = v' -> true | _ -> false
+end
+
 type expr =
   | Int of int
   | Real of float
