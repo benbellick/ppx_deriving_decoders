@@ -104,50 +104,72 @@ module BasicRec = struct
   end
 end
 
-(* let a_rec_id = make_id a_rec_encoder a_rec_decoder *)
-(* let%test "a_rec:1" = check a_rec_id { b = None } *)
-(* let%test "a_rec:2" = check a_rec_id { b = Some { a = None } } *)
+module ComplexRec = struct
+  type a = { l : b option; m : c option }
+  and b = { n : c }
+  and c = { o : a } [@@deriving decoders, encoders]
 
-(* let%test "a_rec:3" = *)
-(*   check a_rec_id { b = Some { a = Some { b = Some { a = None } } } } *)
+  module OnJson = struct
+    open OnJson
 
-(* (\* More complex mutual recursive type *\) *)
-(* type a1 = { l : b1 option; m : c1 option } *)
-(* and b1 = { n : c1 } *)
-(* and c1 = { o : a1 } [@@deriving decoders, encoders] *)
+    let id = make_id a_encoder a_decoder
+    let check = check id
+    let%test "a_rec:json:1" = check {|{"l":null,"m":null}|}
+  end
 
-(* let a1_id = make_id a1_encoder a1_decoder *)
-(* let%test "a1:1" = check a1_id { l = None; m = None } *)
+  module OnValue = struct
+    open OnValue
 
-(* let%test "a1:2" = *)
-(*   check a1_id *)
-(*     { *)
-(*       l = *)
-(*         Some *)
-(*           { n = { o = { l = None; m = Some { o = { l = None; m = None } } } } }; *)
-(*       m = None; *)
-(*     } *)
+    let id = make_id a_encoder a_decoder
+    let check = check id
+    let%test "a1:value:1" = check { l = None; m = None }
 
-(* (\* Random usage of modules intermixed with type vars *\) *)
+    let%test "a1:value:2" =
+      check
+        {
+          l =
+            Some
+              {
+                n =
+                  { o = { l = None; m = Some { o = { l = None; m = None } } } };
+              };
+          m = None;
+        }
+  end
+end
 
-(* module Outer = struct *)
-(*   type ('a, 'b, 'c) v = Fst of 'a list | Snd of 'b option | Trd of 'c *)
-(*   [@@deriving decoders, encoders] *)
+module Nesting = struct
+  module Outer = struct
+    type ('a, 'b, 'c) t = Fst of 'a list | Snd of 'b option | Trd of 'c
+    [@@deriving decoders, encoders]
 
-(*   [@@@deriving.end] *)
+    module Inner = struct
+      type t = int [@@deriving decoders, encoders]
+    end
+  end
 
-(*   module Inner = struct *)
-(*     type t = int [@@deriving decoders, encoders] *)
-(*   end *)
-(* end *)
+  type t = (string, Outer.Inner.t, bool) Outer.t [@@deriving decoders, encoders]
 
-(* type nesting = (string, Outer.Inner.t, bool) Outer.v *)
-(* [@@deriving decoders, encoders] *)
+  module OnJson = struct
+    open OnJson
 
-(* let nesting_id = make_id nesting_encoder nesting_decoder *)
+    let id = make_id t_encoder t_decoder
+    let check = check id
 
-(* let%test "nesting:1" = *)
-(*   check nesting_id (Fst [ "there"; "is"; "some"; "string" ]) *)
+    let%test "nesting:value:1" =
+      check {|{"Fst":["okay","now","we","have","a","string"]}|}
 
-(* let%test "nesting:2" = check nesting_id (Snd (Some 10)) *)
-(* let%test "nesting:3" = check nesting_id (Trd false) *)
+    let%test "nesting:value:2" = check {|{"Snd":21092}|}
+    let%test "nesting:value:3" = check {|{"Trd":false}|}
+  end
+
+  module OnValue = struct
+    open OnValue
+
+    let id = make_id t_encoder t_decoder
+    let check = check id
+    let%test "nesting:value:1" = check (Fst [ "there"; "is"; "some"; "string" ])
+    let%test "nesting:value:2" = check (Snd (Some 10))
+    let%test "nesting:value:3" = check (Trd false)
+  end
+end
