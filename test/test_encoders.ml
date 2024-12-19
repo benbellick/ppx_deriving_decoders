@@ -140,3 +140,11 @@ type my_char = char [@@deriving encoders]
 
 let%test "char" =
   match E.encode_string my_char_encoder 'c' with {|"c"|} -> true | _ -> false
+
+type var = A | B
+type open_var = var = A | B [@@deriving encoders]
+
+let%test "type alias opened cstrs" =
+  match E.encode_string open_var_encoder A with
+  | {|{"A":null}|} -> true
+  | _ -> false

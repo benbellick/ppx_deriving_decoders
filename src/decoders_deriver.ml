@@ -337,12 +337,19 @@ let implementation_generator ~(loc : location) ~rec_flag ~substitutions
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> expr_of_typ ~substitutions manifest
-    | Ptype_variant cstrs, None -> expr_of_variant ~loc ~substitutions cstrs
+    | Ptype_abstract, None ->
+        Location.raise_errorf ~loc
+          "Cannot construct decoder for %s: cannot decode abstract type"
+          type_decl.ptype_name.txt
+    | Ptype_variant cstrs, _ -> expr_of_variant ~loc ~substitutions cstrs
     | Ptype_record label_decs, _ ->
         expr_of_record ~substitutions ~loc label_decs
-    | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
-    | _ -> Location.raise_errorf ~loc "Unhandled mystery"
+    | Ptype_open, _ ->
+        Location.raise_errorf ~loc
+          "Cannot construct decoder for %s: cannot decode extensible type"
+          type_decl.ptype_name.txt
   in
+
   match rec_flag with
   | Nonrecursive -> imple_expr
   | Recursive -> wrap_as_aux ~loc ~name ~expr:imple_expr
