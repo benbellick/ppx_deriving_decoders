@@ -20,7 +20,7 @@ There are two primary ways in which this library can be of use. (More details of
 opam install ppx_deriving_decoders
 ```
 
-The implementation is agnostic to the underlying decoders back-end. The only requirement is the presence of a module with the signature [`Decoders.Decode.S`](https://github.com/mattjbray/ocaml-decoders/blob/59c0dfbe6026af27fce96af82e650a875157385d/src/sig.ml#L8) as specified in [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders), which is aliased to module `D` (for deocders, for encoders you need the corresponding implementation aliased to `E`).
+The implementation is agnostic to the underlying decoders back-end. The only requirement is the presence of a module with the signature [`Decoders.Decode.S`](https://github.com/mattjbray/ocaml-decoders/blob/59c0dfbe6026af27fce96af82e650a875157385d/src/sig.ml#L8) as specified in [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders), which is aliased to module `D` (for decoders, for encoders you need the corresponding implementation aliased to `E`).
 
 E.g., if you wanted to decode using `yojson`, you could use 
 ```
