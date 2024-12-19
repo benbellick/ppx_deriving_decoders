@@ -2,8 +2,8 @@
 
 There are currently two major flavors of handling encoding and decoding data in OCaml.
 
-1. You can use something like [ppx_deriving_yojson](https://github.com/ocaml-ppx/ppx_deriving_yojson) to automatically generate encoders/decoders for your OCaml types, which works great! However, it offers inscrutible errors and limited customization of the decoders.
-2. You can use the a library like [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders) to hand-write your encoders/decoders, which offers excellent error handling and customization! However, writing out encoders/decoders for all of your types is a lot of work. 
+1. You can use something like [ppx_deriving_yojson](https://github.com/ocaml-ppx/ppx_deriving_yojson) to automatically generate encoders/decoders for your OCaml types, which works great! However, it gives some tough errors and there is limited customization of the decoders.
+2. You can use the a library like [mattjbray/ocaml-decoders](https://github.com/mattjbray/ocaml-decoders) to hand-write your encoders/decoders, which offers great errors and quite expansive customization! However, writing out encoders/decoders for all of your types is a lot of work. 
 
 What if there was a way to get the best of both worlds?
 
