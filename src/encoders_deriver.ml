@@ -205,7 +205,6 @@ and expr_of_variant ~loc cstrs =
   pexp_function ~loc cases
 
 let implementation_generator ~(loc : location) type_decl : expression =
-  let _name = to_encoder_name type_decl.ptype_name.txt in
   let imple_expr =
     match (type_decl.ptype_kind, type_decl.ptype_manifest) with
     | Ptype_abstract, Some manifest -> (
@@ -223,7 +222,11 @@ let implementation_generator ~(loc : location) type_decl : expression =
             in
             [%expr fun [%p args] -> [%e expr]]
         | _ -> expr)
-    | Ptype_variant cstrs, None -> expr_of_variant ~loc cstrs
+    | Ptype_abstract, None ->
+        Location.raise_errorf ~loc
+          "Cannot construct encoder for %s: cannot encode abstract type"
+          type_decl.ptype_name.txt
+    | Ptype_variant cstrs, _ -> expr_of_variant ~loc cstrs
     | Ptype_record label_decs, _ ->
         (* And in the case of a top-level record, we also need to explicitly wrap in a lambda with args *)
         let arg_fields =
@@ -237,8 +240,10 @@ let implementation_generator ~(loc : location) type_decl : expression =
         let args = Ast_builder.Default.ppat_record ~loc arg_fields Closed in
         let expr = expr_of_record ~loc label_decs in
         [%expr fun [%p args] -> [%e expr]]
-    | Ptype_open, _ -> Location.raise_errorf ~loc "Unhandled open"
-    | _ -> Location.raise_errorf ~loc "Unhandled mystery"
+    | Ptype_open, _ ->
+        Location.raise_errorf ~loc
+          "Cannot construct encoder for %s: cannot encode extensible type"
+          type_decl.ptype_name.txt
   in
   imple_expr
 

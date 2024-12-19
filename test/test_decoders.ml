@@ -319,3 +319,11 @@ let%test "char" =
   (* We expect an error here because the string must have length 1 *)
   | Error _ -> true
   | _ -> false
+
+type var = A | B
+type open_var = var = A | B [@@deriving decoders]
+
+let%test "type alias opened cstrs" =
+  match D.decode_string open_var_decoder {|{"B":null}|} with
+  | Ok B -> true
+  | _ -> false
